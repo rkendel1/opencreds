@@ -1,5 +1,11 @@
 import type { ConnectionSummary } from "../connection-service.ts";
 import type { ActionDefinition, JsonSchema } from "../core/types.ts";
+import type { BlockContent, DefinitionContent, ListItem, PhrasingContent, Root, TableCell, TableRow } from "mdast";
+
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmFromMarkdown, gfmToMarkdown } from "mdast-util-gfm";
+import { toMarkdown } from "mdast-util-to-markdown";
+import { gfm } from "micromark-extension-gfm";
 
 export type ActionMarkdownContext = {
   connection?: ConnectionSummary;
@@ -12,93 +18,221 @@ export type ActionMarkdownContext = {
  */
 export function renderActionMarkdown(action: ActionDefinition, context: ActionMarkdownContext = {}): string {
   const exampleInput = buildExampleInput(action.inputSchema);
-  const parameterRows = describeParameters(action.inputSchema);
+  const exampleBody = JSON.stringify({ input: exampleInput }, null, 2);
+  const providerPermissions = context.providerPermissions ?? action.providerPermissions;
+  const root: Root = {
+    type: "root",
+    children: [
+      heading(1, action.id),
+      ...markdownBlocks(action.description),
+      heading(2, "Execute"),
+      code(
+        "bash",
+        [
+          `curl -s http://localhost:3000/api/run/${action.id} \\`,
+          "  -H 'content-type: application/json' \\",
+          `  -d '${JSON.stringify({ input: exampleInput })}'`,
+        ].join("\n"),
+      ),
+      code(
+        "ts",
+        [
+          `const response = await fetch("http://localhost:3000/api/run/${action.id}", {`,
+          `  method: "POST",`,
+          `  headers: { "content-type": "application/json" },`,
+          `  body: JSON.stringify(${indentMultiline(exampleBody, 2)}),`,
+          `});`,
+          `const result = await response.json();`,
+        ].join("\n"),
+      ),
+      heading(2, "Input Parameters"),
+      ...describeParameters(action.inputSchema),
+      heading(2, "Required Scopes"),
+      ...describeStringList(action.requiredScopes, "No provider scopes are required."),
+      heading(2, "Provider Permissions"),
+      ...describeStringList(providerPermissions, "No provider permissions are declared."),
+      heading(2, "Current Connection"),
+      ...describeConnection(context.connection),
+      heading(2, "Notes For Agents"),
+      list([
+        textParagraph("Use the local runtime endpoint above; do not call provider APIs directly unless the user asks."),
+        paragraph(["Send JSON with a top-level ", inlineCode("input"), " object."]),
+        textParagraph("Check the current connection and provider scopes before choosing actions on the user's behalf."),
+        textParagraph(
+          "If execution fails with a credential error, ask the user to connect the app in the local console.",
+        ),
+      ]),
+    ],
+  };
 
-  return [
-    `# ${action.id}`,
-    "",
-    action.description,
-    "",
-    "## Execute",
-    "",
-    "```bash",
-    `curl -s http://localhost:3000/api/run/${action.id} \\`,
-    "  -H 'content-type: application/json' \\",
-    `  -d '${JSON.stringify({ input: exampleInput })}'`,
-    "```",
-    "",
-    "```ts",
-    `const response = await fetch("http://localhost:3000/api/run/${action.id}", {`,
-    `  method: "POST",`,
-    `  headers: { "content-type": "application/json" },`,
-    `  body: JSON.stringify(${JSON.stringify({ input: exampleInput }, null, 2)}),`,
-    `});`,
-    `const result = await response.json();`,
-    "```",
-    "",
-    "## Input Parameters",
-    "",
-    parameterRows.length > 0
-      ? ["| Name | Required | Type | Description |", "| --- | --- | --- | --- |", ...parameterRows].join("\n")
-      : "This action does not require input parameters.",
-    "",
-    "## Required Scopes",
-    "",
-    action.requiredScopes.length > 0
-      ? action.requiredScopes.map((scope) => `- \`${scope}\``).join("\n")
-      : "No provider scopes are required.",
-    "",
-    "## Provider Permissions",
-    "",
-    (context.providerPermissions ?? action.providerPermissions).length > 0
-      ? (context.providerPermissions ?? action.providerPermissions)
-          .map((permission) => `- \`${permission}\``)
-          .join("\n")
-      : "No provider permissions are declared.",
-    "",
-    "## Current Connection",
-    "",
-    describeConnection(context.connection),
-    "",
-    "## Notes For Agents",
-    "",
-    "- Use the local runtime endpoint above; do not call provider APIs directly unless the user asks.",
-    "- Send JSON with a top-level `input` object.",
-    "- Check the current connection and provider scopes before choosing actions on the user's behalf.",
-    "- If execution fails with a credential error, ask the user to connect the app in the local console.",
-  ].join("\n");
+  return toMarkdown(root, {
+    bullet: "-",
+    fences: true,
+    extensions: [gfmToMarkdown()],
+  });
 }
 
-function describeConnection(connection: ConnectionSummary | undefined): string {
+function describeConnection(connection: ConnectionSummary | undefined): BlockContent[] {
   if (!connection) {
-    return "This provider is not connected in the local runtime.";
+    return [textParagraph("This provider is not connected in the local runtime.")];
   }
 
-  const scopes =
+  const scopes: Array<string | PhrasingContent> =
     connection.profile.grantedScopes.length > 0
-      ? connection.profile.grantedScopes.map((scope) => `\`${scope}\``).join(", ")
-      : "unknown or not provider-scoped";
+      ? joinPhrasing(
+          connection.profile.grantedScopes.map((scope) => inlineCode(scope)),
+          ", ",
+        )
+      : ["unknown or not provider-scoped"];
 
   return [
-    `- Account: ${connection.profile.displayName}`,
-    `- Account ID: \`${connection.profile.accountId}\``,
-    `- Auth type: \`${connection.authType}\``,
-    `- Granted scopes: ${scopes}`,
-  ].join("\n");
+    list([
+      paragraph(["Account: ", connection.profile.displayName]),
+      paragraph(["Account ID: ", inlineCode(connection.profile.accountId)]),
+      paragraph(["Auth type: ", inlineCode(connection.authType)]),
+      paragraph(["Granted scopes: ", ...scopes]),
+    ]),
+  ];
 }
 
-function describeParameters(schema: JsonSchema): string[] {
+function describeParameters(schema: JsonSchema): BlockContent[] {
   const properties = readProperties(schema);
+  const entries = Object.entries(properties);
+  if (entries.length === 0) {
+    return [textParagraph("This action does not require input parameters.")];
+  }
+
   const required = new Set(readRequired(schema));
-  return Object.entries(properties).map(([name, property]) =>
-    [
-      `\`${name}\``,
-      required.has(name) ? "Yes" : "No",
-      `\`${describeType(property)}\``,
-      escapeTableText(readDescription(property)),
-    ].join(" | "),
-  );
+  return [
+    parameterTable(entries, required),
+    listItems(
+      entries.map(([name, property]) =>
+        listItem([paragraph([inlineCode(name)]), ...markdownBlockContent(readDescription(property))]),
+      ),
+    ),
+  ];
 }
+
+function parameterTable(entries: Array<[string, JsonSchema]>, required: Set<string>): BlockContent {
+  return {
+    type: "table",
+    align: [null, null, null],
+    children: [
+      tableRow(["Name", "Required", "Type"].map(textTableCell)),
+      ...entries.map(([name, property]) =>
+        tableRow([
+          inlineCodeTableCell(name),
+          textTableCell(required.has(name) ? "Yes" : "No"),
+          inlineCodeTableCell(describeType(property)),
+        ]),
+      ),
+    ],
+  };
+}
+
+function describeStringList(values: string[], emptyText: string): BlockContent[] {
+  return values.length > 0 ? [list(values.map((value) => paragraph([inlineCode(value)])))] : [textParagraph(emptyText)];
+}
+
+function markdownBlocks(value: string): DocumentContent[] {
+  const text = value.trim();
+  if (!text) {
+    return [];
+  }
+  return fromMarkdown(text, {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  }).children.filter(isDocumentContent);
+}
+
+function markdownBlockContent(value: string): BlockContent[] {
+  return markdownBlocks(value).filter(isBlockContent);
+}
+
+function heading(depth: 1 | 2, value: string): BlockContent {
+  return { type: "heading", depth, children: [{ type: "text", value }] };
+}
+
+function paragraph(children: Array<string | PhrasingContent>): BlockContent {
+  return {
+    type: "paragraph",
+    children: children.map((child) => (typeof child === "string" ? { type: "text", value: child } : child)),
+  };
+}
+
+function textParagraph(value: string): BlockContent {
+  return paragraph([value]);
+}
+
+function inlineCode(value: string): PhrasingContent {
+  return { type: "inlineCode", value };
+}
+
+function code(lang: string, value: string): BlockContent {
+  return { type: "code", lang, value };
+}
+
+function list(children: BlockContent[]): BlockContent {
+  return listItems(children.map((child) => listItem([child])));
+}
+
+function listItems(children: ListItem[]): BlockContent {
+  return {
+    type: "list",
+    ordered: false,
+    spread: false,
+    children,
+  };
+}
+
+function listItem(children: BlockContent[]): ListItem {
+  return { type: "listItem", spread: children.length > 1, children };
+}
+
+function joinPhrasing(values: PhrasingContent[], separator: string): Array<string | PhrasingContent> {
+  return values.flatMap((value, index) => (index === 0 ? [value] : [separator, value]));
+}
+
+function tableRow(children: TableCell[]): TableRow {
+  return { type: "tableRow", children };
+}
+
+function textTableCell(value: string): TableCell {
+  return { type: "tableCell", children: [{ type: "text", value }] };
+}
+
+function inlineCodeTableCell(value: string): TableCell {
+  return { type: "tableCell", children: [{ type: "inlineCode", value }] };
+}
+
+function indentMultiline(value: string, spaces: number): string {
+  const indent = " ".repeat(spaces);
+  return value
+    .split("\n")
+    .map((line, index) => (index === 0 ? line : `${indent}${line}`))
+    .join("\n");
+}
+
+function isDocumentContent(node: Root["children"][number]): node is BlockContent | DefinitionContent {
+  return [
+    "blockquote",
+    "code",
+    "definition",
+    "footnoteDefinition",
+    "heading",
+    "html",
+    "list",
+    "paragraph",
+    "table",
+    "thematicBreak",
+  ].includes(node.type);
+}
+
+function isBlockContent(node: DocumentContent): node is BlockContent {
+  return node.type !== "definition" && node.type !== "footnoteDefinition";
+}
+
+type DocumentContent = BlockContent | DefinitionContent;
 
 function buildExampleInput(schema: JsonSchema): Record<string, unknown> {
   const properties = readProperties(schema);
@@ -139,10 +273,6 @@ function describeType(schema: JsonSchema | undefined): string {
 
 function readDescription(schema: JsonSchema | undefined): string {
   return schema && typeof schema.description === "string" ? schema.description : "";
-}
-
-function escapeTableText(value: string): string {
-  return value.replaceAll("|", "\\|").replaceAll("\n", " ");
 }
 
 function exampleValue(schema: JsonSchema | undefined): unknown {

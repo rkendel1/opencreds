@@ -174,6 +174,40 @@ describe("ConnectServer", () => {
     expect(markdown).toContain("`messages:read`");
   });
 
+  it("renders markdown descriptions and escapes union type separators in parameter tables", async () => {
+    const app = createTestServer([
+      {
+        ...apiKeyProvider,
+        actions: [
+          {
+            ...echoAction,
+            description: "Echo **input**.\n\n- Supports markdown descriptions.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                cc: {
+                  anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                  description: "Cc recipients.\n\n- Use **email** addresses.\n- Accepts multiple values.",
+                },
+              },
+            },
+          },
+        ],
+      },
+    ]).createApp();
+
+    const response = await app.request("/api/example.echo.md");
+
+    expect(response.status).toBe(200);
+    const markdown = await response.text();
+    expect(markdown).toContain("Echo **input**.\n\n- Supports markdown descriptions.");
+    expect(markdown).toContain("| `cc` | No       | `string \\| array` |");
+    expect(markdown).toContain(
+      "- `cc`\n\n  Cc recipients.\n\n  - Use **email** addresses.\n  - Accepts multiple values.",
+    );
+    expect(markdown).not.toContain("| `cc` | No       | `string | array` |");
+  });
+
   it("applies local action policy before executing HTTP actions", async () => {
     const runs = new MemoryRunLogStore();
     const app = createTestServer(
