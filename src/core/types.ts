@@ -204,13 +204,34 @@ export type ResolvedCredential =
       metadata: Record<string, unknown>;
     };
 
-export interface TransitFileWriter {
+export interface TransitFileUpload {
+  fileId: string;
+  downloadUrl: string;
+  sizeBytes: number;
+  name: string;
+  mimeType: string;
+}
+
+export interface TransitFileRead {
+  file: File;
+  sizeBytes: number;
+  name: string;
+  mimeType: string;
+}
+
+export interface TransitFileStore {
   create(file: File): Promise<{
     fileId: string;
     downloadUrl: string;
     sizeBytes: number;
+    name: string;
+    mimeType: string;
   }>;
+  read(fileId: string): Promise<TransitFileRead>;
+  delete(fileId: string): Promise<boolean>;
 }
+
+export type TransitFileWriter = TransitFileStore;
 
 /**
  * Runtime services available to action executors.

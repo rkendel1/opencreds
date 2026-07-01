@@ -674,15 +674,20 @@ describe("ConnectServer", () => {
         fileId: string;
         downloadUrl: string;
         sizeBytes: number;
+        name: string;
+        mimeType: string;
       };
       expect(uploadBody.fileId).toMatch(/^[a-f0-9]{32}\.txt$/);
       expect(uploadBody.downloadUrl).toBe(`http://localhost:3000/api/files/${uploadBody.fileId}`);
       expect(uploadBody.sizeBytes).toBe(13);
+      expect(uploadBody.name).toBe("report.TXT");
+      expect(uploadBody.mimeType).toBe("text/plain");
 
       const download = await app.request(`/api/files/${uploadBody.fileId}`);
       expect(download.status).toBe(200);
       expect(download.headers.get("content-type")).toBe("text/plain");
       expect(download.headers.get("content-length")).toBe("13");
+      expect(download.headers.get("content-disposition")).toBe('attachment; filename="report.TXT"');
       await expect(download.text()).resolves.toBe("hello transit");
 
       const deleted = await app.request(`/api/files/${uploadBody.fileId}`, {

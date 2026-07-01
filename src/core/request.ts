@@ -40,6 +40,26 @@ export function jsonObject(input: Record<string, unknown>): Record<string, unkno
   return output;
 }
 
+/**
+ * Return JSON-compatible data with undefined object properties removed at every
+ * depth. Array slots are preserved because provider APIs often treat array
+ * position as meaningful.
+ */
+export function compactJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => compactJson(item));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, child]) => child !== undefined)
+      .map(([key, child]) => [key, compactJson(child)]),
+  );
+}
+
 const privateHostnames = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 const privateHostnameSuffixes = [".localhost", ".local"];
 const privateIpv4Cidrs: Array<[number, number]> = [

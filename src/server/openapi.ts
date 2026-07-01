@@ -286,9 +286,11 @@ export function createOpenApiDocument(
             fileId: jsonSchema.string({ description: "Opaque local transit file identifier." }),
             downloadUrl: jsonSchema.string({ description: "URL that serves the uploaded file." }),
             sizeBytes: jsonSchema.number({ description: "Uploaded file size in bytes." }),
+            name: jsonSchema.string({ description: "Original uploaded filename." }),
+            mimeType: jsonSchema.string({ description: "Uploaded file MIME type." }),
           },
           {
-            required: ["fileId", "downloadUrl", "sizeBytes"],
+            required: ["fileId", "downloadUrl", "sizeBytes", "name", "mimeType"],
             description: "Local transit file upload response.",
           },
         ),

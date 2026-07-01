@@ -143,6 +143,7 @@ const fileSystemInfo = s.object(
 const inlineUploadFields = {
   name: nonEmptyString("File name used for inline upload content."),
   mimeType: nonEmptyString("MIME type used for inline upload content."),
+  file: s.transitFile("File uploaded through POST /api/files."),
   contentBase64: nonEmptyString("Base64-encoded file content used for inline uploads."),
   text: s.string({ description: "Plain-text file content used for inline uploads." }),
   description: nonEmptyString("Optional OneDrive file description."),
@@ -303,6 +304,7 @@ const actions: OneDriveActionSource[] = [
       {
         driveId,
         itemId,
+        file: inlineUploadFields.file,
         contentBase64: inlineUploadFields.contentBase64,
         text: inlineUploadFields.text,
         name: inlineUploadFields.name,

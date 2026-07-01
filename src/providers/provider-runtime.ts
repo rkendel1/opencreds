@@ -7,7 +7,7 @@ import type {
   TransitFileWriter,
 } from "../core/types.ts";
 
-import { CastError } from "../core/cast.ts";
+import { CastError, optionalRecord, optionalString, requiredString } from "../core/cast.ts";
 
 /**
  * Fetch-compatible function accepted by provider runtime helpers and tests.
@@ -74,6 +74,14 @@ export interface ProviderTransitFile {
   sizeBytes: number;
   name: string;
   mimeType: string;
+}
+
+export interface ProviderInputFile {
+  fileId: string;
+  file: File;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
 }
 
 /**
@@ -163,6 +171,40 @@ export async function uploadProviderUrlToTransitFile(
     sizeBytes: upload.sizeBytes,
     name: input.name,
     mimeType,
+  };
+}
+
+/**
+ * Read a user-uploaded transit file reference from action input.
+ */
+export async function readTransitFileInput(
+  input: unknown,
+  context: Pick<ApiKeyProviderContext, "transitFiles">,
+): Promise<ProviderInputFile> {
+  if (!context.transitFiles) {
+    throw new ProviderRequestError(400, "Transit file storage is not enabled.");
+  }
+
+  const reference = optionalRecord(input);
+  if (!reference) {
+    throw new ProviderRequestError(400, "file must be a transit file reference.");
+  }
+
+  const fileId = requiredString(reference.fileId, "file.fileId", (message) => new ProviderRequestError(400, message));
+  const stored = await context.transitFiles.read(fileId);
+  const name = optionalString(reference.name) ?? stored.name;
+  const mimeType = optionalString(reference.mimeType) ?? stored.mimeType;
+  const file =
+    name === stored.file.name && mimeType === stored.file.type
+      ? stored.file
+      : new File([await stored.file.arrayBuffer()], name, { type: mimeType });
+
+  return {
+    fileId,
+    file,
+    name,
+    mimeType,
+    sizeBytes: stored.sizeBytes,
   };
 }
 

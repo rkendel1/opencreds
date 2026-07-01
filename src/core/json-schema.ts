@@ -308,6 +308,17 @@ export const jsonSchema = {
     });
   },
 
+  transitFile(description = "A file previously uploaded to the local transit file API."): JsonSchema {
+    return this.object(
+      {
+        fileId: this.nonEmptyString("The transit file identifier returned by POST /api/files."),
+        name: this.nonEmptyString("Optional filename override to send to the provider."),
+        mimeType: this.nonEmptyString("Optional MIME type override to send to the provider."),
+      },
+      { optional: ["name", "mimeType"], description },
+    );
+  },
+
   actionInput(
     properties: Record<string, JsonSchema>,
     required: string[] = [],

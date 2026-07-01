@@ -4,7 +4,7 @@ import type { OneDriveActionName } from "./actions.ts";
 
 import { Buffer } from "node:buffer";
 import { compactObject, requiredRecord } from "../../core/cast.ts";
-import { defineOAuthProviderExecutors, ProviderRequestError } from "../provider-runtime.ts";
+import { defineOAuthProviderExecutors, ProviderRequestError, readTransitFileInput } from "../provider-runtime.ts";
 
 const graphBaseUrl = "https://graph.microsoft.com/v1.0";
 const graphOrigin = new URL(graphBaseUrl).origin;
@@ -543,7 +543,7 @@ async function downloadItemAsFormat(input: Record<string, unknown>, deps: OneDri
 
 async function uploadFile(input: Record<string, unknown>, deps: OneDriveRuntimeDeps) {
   const driveId = readOptionalString(input.driveId);
-  const source = await readUploadSource(input, deps.fetcher, {
+  const source = await readUploadSource(input, deps, {
     requireTargetName: true,
     fallbackToTransitFileName: true,
   });
@@ -587,7 +587,7 @@ async function uploadFile(input: Record<string, unknown>, deps: OneDriveRuntimeD
 
 async function updateFileContent(input: Record<string, unknown>, deps: OneDriveRuntimeDeps) {
   const driveId = readOptionalString(input.driveId);
-  const source = await readUploadSource(input, deps.fetcher, {
+  const source = await readUploadSource(input, deps, {
     requireTargetName: false,
     fallbackToTransitFileName: false,
   });
@@ -1054,7 +1054,7 @@ function readUploadSessionNextStart(value: Record<string, unknown>) {
 
 async function readUploadSource(
   input: Record<string, unknown>,
-  fetcher: typeof fetch,
+  deps: OneDriveRuntimeDeps,
   options: { requireTargetName: boolean; fallbackToTransitFileName: boolean },
 ): Promise<OneDriveUploadSource> {
   const targetNameAlias = readOptionalString(input.name);
@@ -1070,7 +1070,13 @@ async function readUploadSource(
   }
 
   if (fileInput) {
-    throw new ProviderRequestError(400, "file transit input is not supported; use contentBase64 or text");
+    const transitFile = await readTransitFileInput(fileInput, deps);
+    const targetName = targetNameAlias ?? (options.fallbackToTransitFileName ? transitFile.name : undefined);
+    return {
+      bytes: new Uint8Array(await transitFile.file.arrayBuffer()),
+      mimeType: mimeTypeAlias ?? transitFile.mimeType,
+      targetName,
+    };
   }
 
   if (inlineText !== undefined) {
