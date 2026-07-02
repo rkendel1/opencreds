@@ -139,6 +139,31 @@ describe("ConnectServer", () => {
     });
   });
 
+  it("rejects JSON request bodies that are not objects", async () => {
+    const app = createTestServer([
+      {
+        ...apiKeyProvider,
+        actions: [echoAction],
+      },
+    ]).createApp();
+
+    for (const body of ["null", "[]", '"text"']) {
+      const response = await app.request("/v1/actions/example.echo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "invalid_json",
+          message: "Request body must be a JSON object.",
+        },
+      });
+    }
+  });
+
   it("does not expose internal error messages to HTTP callers", async () => {
     const app = createTestServer([
       {
@@ -218,6 +243,20 @@ describe("ConnectServer", () => {
     });
   });
 
+  it("does not serve static fallback responses for missing v1 routes", async () => {
+    const app = createTestServer([apiKeyProvider]).createApp();
+
+    const response = await app.request("/v1/does-not-exist");
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "not_found",
+        message: "Not found.",
+      },
+    });
+  });
+
   it("accepts OAuth client secret extra fields", async () => {
     const app = createTestServer([oauthProvider]).createApp();
 
@@ -242,6 +281,56 @@ describe("ConnectServer", () => {
     });
     expect(body).not.toHaveProperty("secretExtra");
     expect(JSON.stringify(body)).not.toContain("app-token");
+  });
+
+  it("does not copy secret credential fields into fallback connection profiles", async () => {
+    const app = createTestServer([
+      {
+        ...apiKeyProvider,
+        auth: [
+          {
+            type: "api_key",
+            extraFields: [
+              {
+                key: "workspaceId",
+                label: "Workspace ID",
+                inputType: "text",
+                required: true,
+                secret: false,
+              },
+              {
+                key: "signingSecret",
+                label: "Signing Secret",
+                inputType: "password",
+                required: true,
+                secret: true,
+              },
+            ],
+          },
+        ],
+      },
+    ]).createApp();
+
+    const connection = await app.request("/api/connections/example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        authType: "api_key",
+        values: {
+          apiKey: "example-key",
+          workspaceId: "workspace-123",
+          signingSecret: "secret-token",
+        },
+      }),
+    });
+    expect(connection.status).toBe(200);
+    const body = await connection.json();
+    expect(body).toMatchObject({
+      profile: {
+        accountId: "example:workspaceId:workspace-123",
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("secret-token");
   });
 
   it("does not accept the admin token for stored runtime token access", async () => {
@@ -344,12 +433,13 @@ describe("ConnectServer", () => {
       body: JSON.stringify({ authType: "api_key", values: { apiKey: "example-key" } }),
     });
 
+    const longQuery = "a".repeat(600);
     const response = await app.request("/v1/actions/example.echo", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         input: {
-          query: "hello",
+          query: longQuery,
           apiKey: "secret-key",
           nested: { password: "secret-password" },
         },
@@ -369,7 +459,7 @@ describe("ConnectServer", () => {
             grantedScopes: [],
           },
           inputSummary: {
-            query: "hello",
+            query: `${"a".repeat(500)}[truncated]`,
             apiKey: "[redacted]",
             nested: { password: "[redacted]" },
           },

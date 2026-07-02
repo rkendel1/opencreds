@@ -1,10 +1,10 @@
 // Hacker News API docs: https://github.com/HackerNews/API
 
-import { fetchJson, localHeaders } from "./client.ts";
+import { fetchJson, runtimeHeaders } from "./client.ts";
 
-const result = await fetchJson("http://localhost:3000/api/actions/hackernews.get_top_stories/runs", {
+const result = await fetchJson("http://localhost:3000/v1/actions/hackernews.get_top_stories", {
   method: "POST",
-  headers: localHeaders({ "content-type": "application/json" }),
+  headers: runtimeHeaders({ "content-type": "application/json" }),
   body: JSON.stringify({ input: {} }),
 });
 

@@ -26,8 +26,15 @@ export async function readJsonBody(context: Context): Promise<JsonRequestBody> {
   }
 
   try {
-    return (await context.req.json()) as JsonRequestBody;
-  } catch {
+    const body = (await context.req.json()) as unknown;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new HttpRequestError("invalid_json", "Request body must be a JSON object.");
+    }
+    return body as JsonRequestBody;
+  } catch (error) {
+    if (error instanceof HttpRequestError) {
+      throw error;
+    }
     throw new HttpRequestError("invalid_json", "Request body must be valid JSON.");
   }
 }

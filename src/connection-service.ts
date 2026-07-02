@@ -232,6 +232,7 @@ export class ConnectionService {
       ...this.buildCredentialRuntimeData(
         provider,
         "api_key",
+        createApiKeyFields(auth),
         values,
         await this.validateApiKeyCredential(service, { apiKey, values }),
       ),
@@ -260,6 +261,7 @@ export class ConnectionService {
       ...this.buildCredentialRuntimeData(
         provider,
         "custom_credential",
+        auth.fields,
         values,
         await this.validateCustomCredential(service, { values }),
       ),
@@ -448,11 +450,12 @@ export class ConnectionService {
   private buildCredentialRuntimeData(
     provider: ProviderDefinition,
     authType: Exclude<AuthType, "no_auth">,
+    credentialFields: CredentialDefinition[],
     credentialValues: Record<string, string>,
     validation: CredentialValidationResult,
   ): CredentialRuntimeData {
     return {
-      profile: this.createCredentialProfile(provider, authType, credentialValues, validation),
+      profile: this.createCredentialProfile(provider, authType, credentialFields, credentialValues, validation),
       metadata: validation.metadata ?? {},
     };
   }
@@ -464,7 +467,7 @@ export class ConnectionService {
     validation: CredentialValidationResult,
   ): CredentialRuntimeData {
     return {
-      profile: this.createCredentialProfile(provider, authType, {}, validation, {
+      profile: this.createCredentialProfile(provider, authType, [], {}, validation, {
         profile: credential.profile,
         metadata: credential.metadata,
       }),
@@ -478,6 +481,7 @@ export class ConnectionService {
   private createCredentialProfile(
     provider: ProviderDefinition,
     authType: Exclude<AuthType, "no_auth">,
+    credentialFields: CredentialDefinition[],
     credentialValues: Record<string, string>,
     validation: CredentialValidationResult,
     previous?: PreviousCredentialRuntimeData,
@@ -487,7 +491,7 @@ export class ConnectionService {
       readLegacyString(validation.metadata, "providerAccountId") ??
       readLegacyString(validation.metadata, "accountId") ??
       previous?.profile.accountId ??
-      this.createDefaultAccountId(provider, authType, credentialValues);
+      this.createDefaultAccountId(provider, authType, credentialFields, credentialValues);
     const displayName =
       validation.profile?.displayName ??
       readLegacyString(validation.metadata, "accountLabel") ??
@@ -520,10 +524,12 @@ export class ConnectionService {
   private createDefaultAccountId(
     provider: ProviderDefinition,
     authType: Exclude<AuthType, "no_auth">,
+    credentialFields: CredentialDefinition[],
     credentialValues: Record<string, string>,
   ): string {
+    const publicFields = new Set(credentialFields.filter((field) => !field.secret).map((field) => field.key));
     const visibleValues = Object.entries(credentialValues)
-      .filter(([key]) => key !== "apiKey")
+      .filter(([key]) => publicFields.has(key))
       .map(([key, value]) => `${key}:${value}`);
     return visibleValues.length > 0
       ? `${provider.service}:${visibleValues.join(":")}`

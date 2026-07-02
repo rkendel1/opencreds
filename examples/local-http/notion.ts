@@ -1,7 +1,7 @@
 // Notion API docs: https://developers.notion.com/reference/intro
 // Internal integration guide: https://developers.notion.com/guides/get-started/internal-integrations
 
-import { localHeaders } from "./client.ts";
+import { adminHeaders, fetchJson, runtimeHeaders } from "./client.ts";
 
 const token = process.env.NOTION_TOKEN;
 if (!token) {
@@ -9,16 +9,16 @@ if (!token) {
   process.exit(0);
 }
 
-await fetch("http://localhost:3000/api/connections/notion", {
+await fetchJson("http://localhost:3000/api/connections/notion", {
   method: "PUT",
-  headers: localHeaders({ "content-type": "application/json" }),
+  headers: adminHeaders({ "content-type": "application/json" }),
   body: JSON.stringify({ authType: "api_key", values: { apiKey: token } }),
 });
 
-const response = await fetch("http://localhost:3000/api/actions/notion.search/runs", {
+const result = await fetchJson("http://localhost:3000/v1/actions/notion.search", {
   method: "POST",
-  headers: localHeaders({ "content-type": "application/json" }),
+  headers: runtimeHeaders({ "content-type": "application/json" }),
   body: JSON.stringify({ input: { page_size: 5 } }),
 });
 
-console.log(JSON.stringify(await response.json(), null, 2));
+console.log(JSON.stringify(result, null, 2));

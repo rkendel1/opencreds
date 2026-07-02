@@ -170,6 +170,7 @@ const overrideAuthorizationParamsProvider: ProviderDefinition = {
 describe("OAuthFlowService", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("builds an authorization URL from user-provided client config", async () => {
@@ -271,6 +272,70 @@ describe("OAuthFlowService", () => {
       accessToken: "access-token",
     });
     await expect(services.connections.getCredential("example")).resolves.toBeUndefined();
+  });
+
+  it("rejects OAuth callbacks for a different service than the pending state", async () => {
+    const services = createServices([oauthProvider]);
+    await services.clientConfigs.upsertConfig({
+      service: "example",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      extra: {
+        tenant: "default",
+      },
+    });
+
+    const started = await services.flow.startAuthorization({ service: "example" });
+
+    await expect(
+      services.flow.completeAuthorization({ service: "other", state: started.state, code: "code" }),
+    ).rejects.toMatchObject({
+      code: "invalid_oauth_state",
+      message: "OAuth callback service does not match the pending state.",
+    });
+  });
+
+  it("rejects expired OAuth authorization states", async () => {
+    const services = createServices([oauthProvider], { stateMaxAgeMs: 1 });
+    await services.clientConfigs.upsertConfig({
+      service: "example",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      extra: {
+        tenant: "default",
+      },
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    const started = await services.flow.startAuthorization({ service: "example" });
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.002Z"));
+
+    await expect(services.flow.completeAuthorization({ state: started.state, code: "code" })).rejects.toMatchObject({
+      code: "invalid_oauth_state",
+      message: "OAuth state is missing or expired.",
+    });
+  });
+
+  it("rejects malformed OAuth authorization state timestamps", async () => {
+    const services = createServices([oauthProvider]);
+    await services.clientConfigs.upsertConfig({
+      service: "example",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      extra: {
+        tenant: "default",
+      },
+    });
+    await services.states.set({
+      service: "example",
+      state: "bad-created-at",
+      createdAt: "not-a-date",
+    });
+
+    await expect(services.flow.completeAuthorization({ state: "bad-created-at", code: "code" })).rejects.toMatchObject({
+      code: "invalid_oauth_state",
+      message: "OAuth state is missing or expired.",
+    });
   });
 
   it("rejects oversized OAuth token responses", async () => {
@@ -483,7 +548,12 @@ describe("OAuthFlowService", () => {
   });
 });
 
-function createServices(providers: ProviderDefinition[]): {
+function createServices(
+  providers: ProviderDefinition[],
+  options: {
+    stateMaxAgeMs?: number;
+  } = {},
+): {
   clientConfigs: OAuthClientConfigService;
   connections: ConnectionService;
   flow: OAuthFlowService;
@@ -509,6 +579,7 @@ function createServices(providers: ProviderDefinition[]): {
       clientConfigs,
       connections,
       states,
+      stateMaxAgeMs: options.stateMaxAgeMs,
     }),
     states,
   };

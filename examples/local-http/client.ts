@@ -1,5 +1,12 @@
-export function localHeaders(headers: HeadersInit = {}): HeadersInit {
-  const token = process.env.OOMOL_CONNECT_RUNTIME_TOKEN;
+export function adminHeaders(headers: HeadersInit = {}): HeadersInit {
+  return bearerHeaders(process.env.OOMOL_CONNECT_ADMIN_TOKEN, headers);
+}
+
+export function runtimeHeaders(headers: HeadersInit = {}): HeadersInit {
+  return bearerHeaders(process.env.OOMOL_CONNECT_RUNTIME_TOKEN, headers);
+}
+
+function bearerHeaders(token: string | undefined, headers: HeadersInit): HeadersInit {
   if (!token) {
     return headers;
   }

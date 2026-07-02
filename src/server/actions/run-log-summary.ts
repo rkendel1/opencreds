@@ -1,10 +1,15 @@
 const sensitiveKeyPattern = /api[-_]?key|authorization|client[-_]?secret|password|refresh[-_]?token|secret|token/i;
+const maxStringLength = 500;
 
 /**
  * Return a bounded, redacted value suitable for recent run logs.
  */
 export function summarizeForRunLog(value: unknown, depth = 0): unknown {
-  if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "string") {
+    return value.length > maxStringLength ? `${value.slice(0, maxStringLength)}[truncated]` : value;
+  }
+
+  if (value == null || typeof value === "number" || typeof value === "boolean") {
     return value;
   }
 

@@ -94,7 +94,7 @@ The accepted keys are `apiKey` plus the provider's `auth[].extraFields`.
 Execute an action with the default connection:
 
 ```bash
-curl -s -X POST http://localhost:3000/v1/actions/github.get_authenticated_user \
+curl -s -X POST http://localhost:3000/v1/actions/github.get_current_user \
   -H 'content-type: application/json' \
   -d '{"input":{}}'
 ```
@@ -173,7 +173,7 @@ Protect the local SQLite database like any other file containing API keys or OAu
 The default connection is used when no alias is provided:
 
 ```bash
-curl -s -X POST http://localhost:3000/v1/actions/github.get_authenticated_user \
+curl -s -X POST http://localhost:3000/v1/actions/github.get_current_user \
   -H 'content-type: application/json' \
   -d '{"input":{}}'
 ```
@@ -181,7 +181,7 @@ curl -s -X POST http://localhost:3000/v1/actions/github.get_authenticated_user \
 If a named connection already exists, select it with `x-oo-connector-alias`:
 
 ```bash
-curl -s -X POST http://localhost:3000/v1/actions/github.get_authenticated_user \
+curl -s -X POST http://localhost:3000/v1/actions/github.get_current_user \
   -H 'x-oo-connector-alias: work' \
   -H 'content-type: application/json' \
   -d '{"input":{}}'
@@ -190,7 +190,7 @@ curl -s -X POST http://localhost:3000/v1/actions/github.get_authenticated_user \
 The `alias` query parameter is also accepted:
 
 ```bash
-curl -s -X POST "http://localhost:3000/v1/actions/github.get_authenticated_user?alias=work" \
+curl -s -X POST "http://localhost:3000/v1/actions/github.get_current_user?alias=work" \
   -H 'content-type: application/json' \
   -d '{"input":{}}'
 ```

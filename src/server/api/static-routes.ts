@@ -21,7 +21,11 @@ export function registerStaticRoutes(app: Hono, root: string): void {
 
   app.notFound((context) => {
     const requestUrl = new URL(context.req.url);
-    if (requestUrl.pathname.startsWith("/api") || requestUrl.pathname.startsWith("/mcp")) {
+    if (
+      requestUrl.pathname.startsWith("/api") ||
+      requestUrl.pathname.startsWith("/v1") ||
+      requestUrl.pathname.startsWith("/mcp")
+    ) {
       return notFound(context);
     }
 

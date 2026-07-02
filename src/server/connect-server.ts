@@ -564,7 +564,7 @@ export class ConnectServer {
     return this.writeOAuthResult(context, this.options.oauthClientConfigs.deleteConfig(service));
   }
 
-  private async completeOAuth(context: Context, _service: string): Promise<Response> {
+  private async completeOAuth(context: Context, service: string): Promise<Response> {
     const state = context.req.query("state");
     const code = context.req.query("code");
     if (!state || !code) {
@@ -573,7 +573,7 @@ export class ConnectServer {
 
     let result: { service: string; connected: true };
     try {
-      result = await this.options.oauthFlow.completeAuthorization({ state, code });
+      result = await this.options.oauthFlow.completeAuthorization({ service, state, code });
     } catch (error) {
       if (error instanceof OAuthFlowError) {
         return jsonError(context, 400, error.code, error.message);

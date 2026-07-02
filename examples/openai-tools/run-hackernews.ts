@@ -1,7 +1,7 @@
 // OpenAI Responses API docs: https://platform.openai.com/docs/api-reference/responses/create
 // OpenAI function calling flow: https://platform.openai.com/docs/guides/function-calling
 
-import { localHeaders } from "../local-http/client.ts";
+import { adminHeaders, fetchJson, runtimeHeaders } from "../local-http/client.ts";
 
 interface CatalogAction {
   id: string;
@@ -48,12 +48,11 @@ if (!model) {
   console.log("Set OPENAI_MODEL to run this example.");
   process.exit(0);
 }
-const actionsResponse = await fetch("http://localhost:3000/api/actions", {
-  headers: localHeaders(),
-});
-const actions = ((await actionsResponse.json()) as CatalogAction[]).filter((action) =>
-  action.id.startsWith("hackernews."),
-);
+const actions = (
+  await fetchJson<CatalogAction[]>("http://localhost:3000/api/actions", {
+    headers: adminHeaders(),
+  })
+).filter((action) => action.id.startsWith("hackernews."));
 const toolNameToActionId = new Map(actions.map((action) => [toOpenAiToolName(action.id), action.id]));
 const tools: OpenAiFunctionTool[] = actions.map((action) => ({
   type: "function",
@@ -77,12 +76,11 @@ for (const toolCall of toolCalls) {
     throw new Error(`Unknown tool call: ${toolCall.name}`);
   }
 
-  const executionResponse = await fetch(`http://localhost:3000/api/actions/${actionId}/runs`, {
+  const executionResult = await fetchJson(`http://localhost:3000/v1/actions/${actionId}`, {
     method: "POST",
-    headers: localHeaders({ "content-type": "application/json" }),
+    headers: runtimeHeaders({ "content-type": "application/json" }),
     body: JSON.stringify({ input: JSON.parse(toolCall.arguments || "{}") }),
   });
-  const executionResult = await executionResponse.json();
 
   input.push(toolCall);
   input.push({

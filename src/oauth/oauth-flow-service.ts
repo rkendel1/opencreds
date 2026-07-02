@@ -17,6 +17,12 @@ export interface OAuthAuthorizationStartInput {
   connectionName?: string;
 }
 
+export interface OAuthAuthorizationCompleteInput {
+  state: string;
+  code: string;
+  service?: string;
+}
+
 /**
  * Short-lived OAuth state stored while the browser completes authorization.
  */
@@ -43,15 +49,18 @@ export class OAuthFlowService {
   private readonly clientConfigs: OAuthClientConfigService;
   private readonly connections: ConnectionService;
   private readonly states: IOAuthStateStore;
+  private readonly stateMaxAgeMs: number;
 
   constructor(input: {
     clientConfigs: OAuthClientConfigService;
     connections: ConnectionService;
     states: IOAuthStateStore;
+    stateMaxAgeMs?: number;
   }) {
     this.clientConfigs = input.clientConfigs;
     this.connections = input.connections;
     this.states = input.states;
+    this.stateMaxAgeMs = input.stateMaxAgeMs ?? 15 * 60 * 1000;
   }
 
   async startAuthorization(input: OAuthAuthorizationStartInput): Promise<OAuthAuthorizationStart> {
@@ -102,9 +111,15 @@ export class OAuthFlowService {
     };
   }
 
-  async completeAuthorization(input: { state: string; code: string }): Promise<{ service: string; connected: true }> {
+  async completeAuthorization(input: OAuthAuthorizationCompleteInput): Promise<{ service: string; connected: true }> {
     const pending = await this.states.take(input.state);
     if (!pending) {
+      throw new OAuthFlowError("invalid_oauth_state", "OAuth state is missing or expired.");
+    }
+    if (input.service && input.service !== pending.service) {
+      throw new OAuthFlowError("invalid_oauth_state", "OAuth callback service does not match the pending state.");
+    }
+    if (isExpiredOAuthState(pending, this.stateMaxAgeMs)) {
       throw new OAuthFlowError("invalid_oauth_state", "OAuth state is missing or expired.");
     }
 
@@ -167,6 +182,11 @@ function createTokenExtraFields(state: OAuthAuthorizationState): Record<string, 
   return {
     code_verifier: state.pkceCodeVerifier,
   };
+}
+
+function isExpiredOAuthState(state: OAuthAuthorizationState, maxAgeMs: number): boolean {
+  const createdAt = Date.parse(state.createdAt);
+  return !Number.isFinite(createdAt) || Date.now() - createdAt > maxAgeMs;
 }
 
 function createPkceCodeVerifier(): string {

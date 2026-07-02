@@ -75,7 +75,7 @@ curl -s -X PUT http://localhost:3000/api/connections/github \
 Execute an action with that default connection:
 
 ```bash
-curl -s -X POST http://localhost:3000/v1/actions/github.get_authenticated_user \
+curl -s -X POST http://localhost:3000/v1/actions/github.get_current_user \
   -H 'content-type: application/json' \
   -d '{"input":{}}'
 ```

@@ -6,7 +6,9 @@ Start the local runtime:
 npm run dev
 ```
 
-If the runtime requires a bearer token, set `OOMOL_CONNECT_RUNTIME_TOKEN` when running examples.
+If the server requires bearer tokens, set `OOMOL_CONNECT_ADMIN_TOKEN` for examples that configure
+connections or OAuth clients. Set `OOMOL_CONNECT_RUNTIME_TOKEN` for examples that run `/v1`
+actions.
 
 Run a no-auth Hacker News action:
 
