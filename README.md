@@ -404,11 +404,11 @@ Local admin endpoints power the web console, examples, and setup scripts:
 npm run fix-check
 npm run generate:catalog
 npm test
-npm run build
 ```
 
 `npm run fix-check` runs lint fixes, formatting fixes, and the `src` typecheck. Formatting and
-linting use `oxfmt` and `oxlint`.
+linting use `oxfmt` and `oxlint`. Run `npm run build` separately only when you need a no-fix
+typecheck, such as CI parity after generated files changed.
 
 ### Project Layout
 
@@ -438,8 +438,8 @@ Typical provider workflow:
 
 ```bash
 npm run generate:catalog
+npm run fix-check
 npm test
-npm run build
 ```
 
 Provider definitions generate registry and catalog files. Provider executors are loaded only when

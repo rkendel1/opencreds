@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 /**
  * Error factory used by strict cast helpers.
  */
@@ -58,6 +60,30 @@ export function requiredString(
   }
 
   throw createError(`${fieldName} is required.`);
+}
+
+/**
+ * Decode a strict non-empty Base64 string into bytes, or throw.
+ */
+export function base64Bytes(
+  value: unknown,
+  fieldName: string,
+  createError: CastErrorFactory = (message) => new CastError(message),
+): Uint8Array<ArrayBuffer> {
+  const normalized = optionalString(value);
+  if (!normalized) {
+    throw createError(`${fieldName} must be valid base64`);
+  }
+
+  try {
+    const bytes = Buffer.from(normalized, "base64");
+    if (bytes.length === 0 || stripBase64Padding(bytes.toString("base64")) !== stripBase64Padding(normalized)) {
+      throw createError(`${fieldName} must be valid base64`);
+    }
+    return Uint8Array.from(bytes);
+  } catch {
+    throw createError(`${fieldName} must be valid base64`);
+  }
 }
 
 /**
@@ -263,6 +289,14 @@ export function pickOptionalString(input: Record<string, unknown>, ...keys: stri
   }
 
   return undefined;
+}
+
+function stripBase64Padding(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "=") {
+    end -= 1;
+  }
+  return value.slice(0, end);
 }
 
 /**

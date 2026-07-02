@@ -122,7 +122,7 @@ npm run generate:catalog
 3. Run project checks:
 
 ```bash
-npm run build
+npm run fix-check
 ```
 
 4. Run a local smoke test if an executor exists:
@@ -160,6 +160,9 @@ curl -s 'http://localhost:3000/api/actions/<service>.<actionId>/execute' \
 Use these commands before finishing provider work:
 
 ```bash
+npm run fix-check
 npm run generate:catalog
-npm run build
 ```
+
+`npm run fix-check` runs lint fixes, formatting fixes, and the `src` typecheck. Run `npm run build`
+separately only when you need a no-fix typecheck for CI parity.

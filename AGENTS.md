@@ -47,6 +47,7 @@
 
 ## Verification
 
-- Before finishing code changes, run `npm run fix-check`, then `npm run build`.
+- Before finishing code changes, run `npm run fix-check`. It runs lint fixes, formatting fixes, and the `src` typecheck.
+- Run `npm run build` only when you need a separate no-fix typecheck, for example after generated files changed or for CI parity.
 - Run `npm run generate:catalog` when provider definitions or actions change.
 - Run provider examples manually when the task changes user-facing example behavior.
