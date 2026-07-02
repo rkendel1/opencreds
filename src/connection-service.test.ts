@@ -88,6 +88,22 @@ const oauthProvider: ProviderDefinition = {
   actions: [],
 };
 
+const oauthRefreshProvider: ProviderDefinition = {
+  ...oauthProvider,
+  service: "refresh_example",
+  auth: [
+    {
+      type: "oauth2",
+      authorizationUrl: "https://example.com/oauth/authorize",
+      tokenUrl: "https://example.com/oauth/token",
+      refreshTokenUrl: "https://example.com/oauth/refresh",
+      scopes: ["read"],
+      redirectPath: "/oauth/callback/refresh_example",
+      tokenEndpointAuthMethod: "client_secret_post",
+    },
+  ],
+};
+
 const testProfile = {
   accountId: "example-account",
   displayName: "Example Account",
@@ -349,6 +365,51 @@ describe("ConnectionService", () => {
     });
     expect(fetch).toHaveBeenCalledWith(
       "https://example.com/oauth/token",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
+
+  it("uses provider refresh token URLs when refreshing expired OAuth credentials", async () => {
+    const store = new MemoryConnectionStore();
+    const oauthClientConfigs = createOAuthClientConfigs([oauthRefreshProvider]);
+    const service = createService([oauthRefreshProvider], {
+      oauthCredentials: new OAuthCredentialRefreshService(oauthClientConfigs),
+      store,
+    });
+    await oauthClientConfigs.upsertConfig({
+      service: "refresh_example",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+    });
+    await store.set("refresh_example", "default", {
+      authType: "oauth2",
+      accessToken: "expired-token",
+      tokenType: "Bearer",
+      refreshToken: "refresh-token",
+      expiresAt: "2026-01-01T00:00:00.000Z",
+      profile: testProfile,
+      metadata: {},
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          access_token: "fresh-token",
+          expires_in: 3600,
+          token_type: "Bearer",
+        }),
+      ),
+    );
+
+    await expect(service.getCredential("refresh_example")).resolves.toMatchObject({
+      authType: "oauth2",
+      accessToken: "fresh-token",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://example.com/oauth/refresh",
       expect.objectContaining({
         method: "POST",
       }),

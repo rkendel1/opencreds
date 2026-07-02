@@ -59,6 +59,8 @@ const geoTargetTypeAliases = createUppercaseAliasMap([
 
 interface GoogleAdsRuntimeContext {
   accessToken: string;
+  customerId?: string;
+  developerToken?: string;
   fetcher: ProviderFetch;
   signal?: AbortSignal;
 }
@@ -83,8 +85,12 @@ export const executors: ProviderExecutors = defineProviderExecutors<GoogleAdsRun
   handlers: googleAdsActionHandlers,
   async createContext(context, fetcher): Promise<GoogleAdsRuntimeContext> {
     const credential = await requireOAuthCredential(context, service);
+    const oauthClientExtra = optionalRecord(credential.metadata.oauthClientExtra);
+    const oauthClientSecretExtra = optionalRecord(credential.metadata.oauthClientSecretExtra);
     return {
       accessToken: credential.accessToken,
+      customerId: optionalString(oauthClientExtra?.customerId),
+      developerToken: optionalString(oauthClientSecretExtra?.developerToken),
       fetcher,
       signal: context.signal,
     };
@@ -111,6 +117,7 @@ export const credentialValidators: CredentialValidators = {
       },
       grantedScopes: parseScopeString(input.metadata.scope),
       metadata: {
+        ...input.metadata,
         currentAccount: profile,
       },
     };
@@ -118,12 +125,12 @@ export const credentialValidators: CredentialValidators = {
 };
 
 async function getCampaignById(input: Record<string, unknown>, context: GoogleAdsRuntimeContext) {
-  const customerId = resolveGoogleAdsCustomerId(input);
+  const customerId = resolveGoogleAdsCustomerId(input, context);
   const campaignId = normalizeGoogleAdsId(input.campaignId, "campaignId");
   const rows = await googleAdsSearch(
     {
       customerId,
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       query: [
         "SELECT",
         "campaign.resource_name,",
@@ -150,8 +157,8 @@ async function getCampaignById(input: Record<string, unknown>, context: GoogleAd
 async function getCampaignByName(input: Record<string, unknown>, context: GoogleAdsRuntimeContext) {
   const rows = await googleAdsSearch(
     {
-      customerId: resolveGoogleAdsCustomerId(input),
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      customerId: resolveGoogleAdsCustomerId(input, context),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       query: [
         "SELECT",
         "campaign.resource_name,",
@@ -181,7 +188,7 @@ async function listAccessibleCustomers(input: Record<string, unknown>, context: 
     resource_names?: unknown[];
   }>(
     {
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       path: "/customers:listAccessibleCustomers",
       method: "GET",
     },
@@ -196,8 +203,8 @@ async function listAccessibleCustomers(input: Record<string, unknown>, context: 
 async function searchStreamGaql(input: Record<string, unknown>, context: GoogleAdsRuntimeContext) {
   const response = await googleAdsRequest(
     {
-      customerId: resolveGoogleAdsCustomerId(input),
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      customerId: resolveGoogleAdsCustomerId(input, context),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       path: "/googleAds:searchStream",
       body: compactObject({
         query: requireNonEmptyString(input.query, "query"),
@@ -236,8 +243,8 @@ async function searchStreamGaql(input: Record<string, unknown>, context: GoogleA
 async function listCustomerLists(input: Record<string, unknown>, context: GoogleAdsRuntimeContext) {
   const payload = await googleAdsSearchPayload(
     {
-      customerId: resolveGoogleAdsCustomerId(input),
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      customerId: resolveGoogleAdsCustomerId(input, context),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       pageToken: optionalString(input.pageToken),
       query: [
         "SELECT",
@@ -268,8 +275,8 @@ async function createCustomerList(input: Record<string, unknown>, context: Googl
     results?: Array<{ resourceName?: string }>;
   }>(
     {
-      customerId: resolveGoogleAdsCustomerId(input),
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      customerId: resolveGoogleAdsCustomerId(input, context),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       path: "/userLists:mutate",
       body: {
         operations: [
@@ -300,8 +307,8 @@ async function createCustomerList(input: Record<string, unknown>, context: Googl
 }
 
 async function addOrRemoveToCustomerList(input: Record<string, unknown>, context: GoogleAdsRuntimeContext) {
-  const customerId = resolveGoogleAdsCustomerId(input);
-  const developerToken = resolveGoogleAdsDeveloperToken(input);
+  const customerId = resolveGoogleAdsCustomerId(input, context);
+  const developerToken = resolveGoogleAdsDeveloperToken(input, context);
   const userListResourceName = requireNonEmptyString(input.resourceName, "resourceName");
   const operation = requireOperation(input.operation);
   const emails = requireEmailList(input.emails);
@@ -371,8 +378,8 @@ async function mutateAdGroups(input: Record<string, unknown>, context: GoogleAds
     partialFailureError?: unknown;
   }>(
     {
-      customerId: resolveGoogleAdsCustomerId(input),
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      customerId: resolveGoogleAdsCustomerId(input, context),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       path: "/adGroups:mutate",
       body: compactObject({
         operations,
@@ -396,8 +403,8 @@ async function mutateCampaigns(input: Record<string, unknown>, context: GoogleAd
     partialFailureError?: unknown;
   }>(
     {
-      customerId: resolveGoogleAdsCustomerId(input),
-      developerToken: resolveGoogleAdsDeveloperToken(input),
+      customerId: resolveGoogleAdsCustomerId(input, context),
+      developerToken: resolveGoogleAdsDeveloperToken(input, context),
       path: "/campaigns:mutate",
       body: compactObject({
         operations,
@@ -755,12 +762,12 @@ function hashNormalizedEmail(email: string): string {
   return createHash("sha256").update(email).digest("hex");
 }
 
-function resolveGoogleAdsCustomerId(input: Record<string, unknown>): string {
-  return normalizeGoogleAdsId(input.customerId, "customerId");
+function resolveGoogleAdsCustomerId(input: Record<string, unknown>, context: GoogleAdsRuntimeContext): string {
+  return normalizeGoogleAdsId(input.customerId ?? context.customerId, "customerId");
 }
 
-function resolveGoogleAdsDeveloperToken(input: Record<string, unknown>): string {
-  return requireNonEmptyString(input.developerToken, "developerToken");
+function resolveGoogleAdsDeveloperToken(input: Record<string, unknown>, context: GoogleAdsRuntimeContext): string {
+  return requireNonEmptyString(input.developerToken ?? context.developerToken, "developerToken");
 }
 
 function normalizeGoogleAdsId(value: unknown, fieldName: string): string {

@@ -1,6 +1,12 @@
-import type { ExecutionContext, ExecutionResult, ProviderExecutors } from "../../core/types.ts";
+import type {
+  CredentialValidationResult,
+  CredentialValidators,
+  ExecutionContext,
+  ExecutionResult,
+  ProviderExecutors,
+} from "../../core/types.ts";
 
-import { optionalString } from "../../core/cast.ts";
+import { optionalRecord, optionalString } from "../../core/cast.ts";
 import { ProviderRequestError, toProviderExecutionError } from "../provider-runtime.ts";
 import { tencentDocsActionHandlers } from "./runtime.ts";
 
@@ -46,3 +52,38 @@ export const executors: ProviderExecutors = Object.fromEntries(
     },
   ]),
 );
+
+export const credentialValidators: CredentialValidators = {
+  async oauth2(input, { fetcher }): Promise<CredentialValidationResult> {
+    const url = new URL("https://docs.qq.com/oauth/v2/userinfo");
+    url.searchParams.set("access_token", input.accessToken);
+    const response = await fetcher(url.toString());
+    const envelope = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!response.ok || envelope.ret !== 0) {
+      throw new ProviderRequestError(
+        response.status || 502,
+        optionalString(envelope.msg) ?? "Tencent Docs userinfo failed.",
+      );
+    }
+
+    const data = optionalRecord(envelope.data) ?? {};
+    const openID = optionalString(data.openID) ?? optionalString(data.openId);
+    if (!openID) {
+      throw new ProviderRequestError(502, "tencent_docs userinfo response is missing openID.");
+    }
+    const nick = optionalString(data.nick);
+
+    return {
+      profile: {
+        accountId: openID,
+        displayName: nick ?? openID,
+      },
+      metadata: {
+        ...input.metadata,
+        clientId: optionalString(input.metadata.oauthClientId) ?? input.metadata.clientId,
+        openID,
+        nick,
+      },
+    };
+  },
+};

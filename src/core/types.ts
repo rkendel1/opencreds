@@ -34,6 +34,21 @@ export type CredentialDefinition = {
 };
 
 /**
+ * OAuth app configuration field storage location.
+ */
+export type OAuthClientConfigFieldLocation = "extra" | "secretExtra";
+
+/**
+ * A single OAuth client config field that users can configure locally.
+ */
+export type OAuthClientConfigFieldDefinition = CredentialDefinition & {
+  /** Whether the value is stored as public extra metadata or secret local data. */
+  location?: OAuthClientConfigFieldLocation;
+  /** Default local value used when the caller omits this OAuth client config field. */
+  defaultValue?: string;
+};
+
+/**
  * API key connection configuration shown by the local console.
  */
 export type ApiKeyAuthDefinition = {
@@ -79,18 +94,59 @@ export type OAuth2AuthDefinition = {
   authorizationUrl: string;
   /** Provider token endpoint used to exchange an authorization code. */
   tokenUrl: string;
+  /** Provider token endpoint used to refresh an access token. Defaults to tokenUrl. */
+  refreshTokenUrl?: string;
   /** OAuth scopes joined with spaces into the authorization URL `scope` parameter. */
   scopes: string[];
+  /** Separator used when joining OAuth scopes. Defaults to a space. */
+  scopeSeparator?: " " | ",";
   /** Local callback path appended to the configured runtime origin. */
   redirectPath: string;
   /** How the runtime sends client credentials to the token endpoint. */
   tokenEndpointAuthMethod: "client_secret_basic" | "client_secret_post" | "none";
   /** Token request body encoding. Defaults to OAuth form encoding. */
   tokenRequestFormat?: "form" | "json";
+  /** Provider-specific OAuth token request field names. */
+  tokenRequestFields?: {
+    grantType?: string | false;
+    code?: string;
+    redirectUri?: string | false;
+    refreshToken?: string;
+    clientId?: string | false;
+    clientSecret?: string | false;
+    authorizationCode?: {
+      grantType?: string | false;
+      code?: string;
+      redirectUri?: string | false;
+    };
+    refresh?: {
+      grantType?: string | false;
+      refreshToken?: string;
+    };
+  };
+  /** Provider-specific token response envelope. */
+  tokenResponseEnvelope?: {
+    dataField: string;
+    codeField?: string;
+    successCode?: number;
+    messageField?: string;
+  };
+  /** Proof Key for Code Exchange mode for providers that require per-flow verifiers. */
+  pkce?: {
+    method: "S256";
+  };
   /** Extra static authorization URL parameters, such as Google `access_type=offline`. */
   authorizationParams?: Record<string, string>;
+  /** Provider-specific OAuth authorization request field names. */
+  authorizationRequestFields?: {
+    clientId?: string | false;
+    redirectUri?: string | false;
+    responseType?: string | false;
+    state?: string | false;
+    scope?: string | false;
+  };
   /** Extra local OAuth app fields required before starting authorization. */
-  clientConfigFields?: CredentialDefinition[];
+  clientConfigFields?: OAuthClientConfigFieldDefinition[];
 };
 
 /**

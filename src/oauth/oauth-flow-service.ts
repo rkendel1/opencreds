@@ -1,6 +1,7 @@
 import type { ConnectionService } from "../connection-service.ts";
 import type { OAuthClientConfigService } from "./oauth-client-config-service.ts";
 
+import { createHash, randomBytes } from "node:crypto";
 import { requestAuthorizationCodeToken } from "./oauth-token.ts";
 
 /**
@@ -24,6 +25,7 @@ export type OAuthAuthorizationState = {
   connectionName?: string;
   state: string;
   createdAt: string;
+  pkceCodeVerifier?: string;
 };
 
 /**
@@ -61,23 +63,37 @@ export class OAuthFlowService {
     }
 
     const state = crypto.randomUUID();
+    const pkceCodeVerifier = auth.pkce ? createPkceCodeVerifier() : undefined;
     await this.states.set({
       service,
       connectionName,
       state,
       createdAt: new Date().toISOString(),
+      pkceCodeVerifier,
     });
 
-    const authorizationUrl = new URL(auth.authorizationUrl);
-    authorizationUrl.searchParams.set("client_id", config.clientId);
-    authorizationUrl.searchParams.set("redirect_uri", this.clientConfigs.expectedRedirectUri(service));
-    authorizationUrl.searchParams.set("response_type", "code");
-    authorizationUrl.searchParams.set("state", state);
-    if (auth.scopes.length > 0) {
-      authorizationUrl.searchParams.set("scope", auth.scopes.join(" "));
+    const authorizationUrl = new URL(this.clientConfigs.resolveEndpointUrl(service, auth.authorizationUrl, config));
+    setAuthorizationParam(authorizationUrl, auth.authorizationRequestFields?.clientId, "client_id", config.clientId);
+    setAuthorizationParam(
+      authorizationUrl,
+      auth.authorizationRequestFields?.redirectUri,
+      "redirect_uri",
+      this.clientConfigs.expectedRedirectUri(service),
+    );
+    setAuthorizationParam(authorizationUrl, auth.authorizationRequestFields?.responseType, "response_type", "code");
+    setAuthorizationParam(authorizationUrl, auth.authorizationRequestFields?.state, "state", state);
+    if (auth.scopes.length > 0 && auth.authorizationRequestFields?.scope !== false) {
+      authorizationUrl.searchParams.set(
+        auth.authorizationRequestFields?.scope ?? "scope",
+        auth.scopes.join(auth.scopeSeparator ?? " "),
+      );
     }
     for (const [key, value] of Object.entries(auth.authorizationParams ?? {})) {
       authorizationUrl.searchParams.set(key, value);
+    }
+    if (pkceCodeVerifier) {
+      authorizationUrl.searchParams.set("code_challenge", createPkceCodeChallenge(pkceCodeVerifier));
+      authorizationUrl.searchParams.set("code_challenge_method", auth.pkce?.method ?? "S256");
     }
 
     return {
@@ -106,18 +122,63 @@ export class OAuthFlowService {
       clientId: config.clientId,
       clientSecret: config.clientSecret,
       redirectUri: this.clientConfigs.expectedRedirectUri(pending.service),
+      responseEnvelope: auth.tokenResponseEnvelope,
+      tokenRequestFields: auth.tokenRequestFields,
       tokenEndpointAuthMethod: auth.tokenEndpointAuthMethod,
       tokenRequestFormat: auth.tokenRequestFormat,
-      tokenUrl: auth.tokenUrl,
+      tokenUrl: this.clientConfigs.resolveEndpointUrl(pending.service, auth.tokenUrl, config),
+      extraFields: createTokenExtraFields(pending),
       createError: (message) => new OAuthFlowError("oauth_token_exchange_failed", message),
     });
+    const oauthCredential = {
+      ...tokenResponse,
+      metadata: {
+        ...tokenResponse.metadata,
+        oauthClientId: config.clientId,
+        oauthClientExtra: config.extra,
+        oauthClientSecretExtra: config.secretExtra,
+      },
+    };
 
-    await this.connections.setOAuthCredential(pending.service, tokenResponse, pending.connectionName);
+    await this.connections.setOAuthCredential(pending.service, oauthCredential, pending.connectionName);
     return {
       service: pending.service,
       connected: true,
     };
   }
+}
+
+function setAuthorizationParam(
+  url: URL,
+  fieldName: string | false | undefined,
+  defaultFieldName: string,
+  value: string,
+): void {
+  if (fieldName !== false) {
+    url.searchParams.set(fieldName ?? defaultFieldName, value);
+  }
+}
+
+function createTokenExtraFields(state: OAuthAuthorizationState): Record<string, string> | undefined {
+  if (!state.pkceCodeVerifier) {
+    return undefined;
+  }
+
+  return {
+    code_verifier: state.pkceCodeVerifier,
+  };
+}
+
+function createPkceCodeVerifier(): string {
+  return encodeBase64Url(randomBytes(48));
+}
+
+function createPkceCodeChallenge(codeVerifier: string): string {
+  return encodeBase64Url(createHash("sha256").update(codeVerifier).digest());
+}
+
+function encodeBase64Url(value: Uint8Array): string {
+  return Buffer.from(value).toString("base64").replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 /**

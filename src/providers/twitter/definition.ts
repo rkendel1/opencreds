@@ -4,12 +4,56 @@ import { twitterActions } from "./actions.ts";
 
 const service = "twitter";
 
+const twitterOAuthScopes = [
+  "tweet.read",
+  "users.read",
+  "tweet.write",
+  "media.write",
+  "offline.access",
+  "follows.read",
+  "follows.write",
+  "like.read",
+  "like.write",
+  "list.read",
+  "list.write",
+  "bookmark.read",
+  "bookmark.write",
+  "dm.read",
+  "dm.write",
+  "mute.read",
+  "mute.write",
+  "space.read",
+];
+
 export const provider: ProviderDefinition = {
   service,
   displayName: "X (Twitter)",
   categories: ["Social", "Marketing"],
-  authTypes: ["custom_credential"],
+  authTypes: ["oauth2", "custom_credential"],
   auth: [
+    {
+      type: "oauth2",
+      authorizationUrl: "https://x.com/i/oauth2/authorize",
+      tokenUrl: "https://api.x.com/2/oauth2/token",
+      scopes: twitterOAuthScopes,
+      redirectPath: "/oauth/callback/twitter",
+      tokenEndpointAuthMethod: "client_secret_basic",
+      pkce: {
+        method: "S256",
+      },
+      clientConfigFields: [
+        {
+          key: "appBearerToken",
+          label: "App Bearer Token",
+          inputType: "password",
+          required: false,
+          secret: true,
+          location: "secretExtra",
+          placeholder: "twitter_app_bearer_token",
+          description: "Optional X app-only bearer token used by full archive search and compliance job actions.",
+        },
+      ],
+    },
     {
       type: "custom_credential",
       fields: [

@@ -34,6 +34,7 @@ describe("SqliteRuntimeDatabase", () => {
       clientId: "client-id",
       clientSecret: "client-secret",
       extra: { tenant: "default" },
+      secretExtra: {},
     });
     await first.oauthStateStore.set({
       service: "gmail",

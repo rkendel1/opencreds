@@ -32,6 +32,34 @@ const apiKeyProvider: ProviderDefinition = {
   actions: [],
 };
 
+const oauthProvider: ProviderDefinition = {
+  service: "oauth_example",
+  displayName: "OAuth Example",
+  categories: ["Developer Tools"],
+  authTypes: ["oauth2"],
+  auth: [
+    {
+      type: "oauth2",
+      authorizationUrl: "https://example.com/oauth/authorize",
+      tokenUrl: "https://example.com/oauth/token",
+      scopes: ["read"],
+      redirectPath: "/oauth/callback/oauth_example",
+      tokenEndpointAuthMethod: "client_secret_post",
+      clientConfigFields: [
+        {
+          key: "appBearerToken",
+          label: "App Bearer Token",
+          inputType: "password",
+          required: false,
+          secret: true,
+          location: "secretExtra",
+        },
+      ],
+    },
+  ],
+  actions: [],
+};
+
 const echoAction: ActionDefinition = {
   id: "example.echo",
   service: "example",
@@ -127,6 +155,29 @@ describe("ConnectServer", () => {
     expect(provider.status).toBe(200);
     await expect(provider.json()).resolves.toMatchObject({
       service: "example",
+    });
+  });
+
+  it("accepts OAuth client secret extra fields", async () => {
+    const app = createTestServer([oauthProvider]).createApp();
+
+    const response = await app.request("/api/oauth/configs/oauth_example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        clientId: "client-id",
+        clientSecret: "client-secret",
+        secretExtra: {
+          appBearerToken: "app-token",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      service: "oauth_example",
+      configured: true,
+      clientId: "client-id",
     });
   });
 

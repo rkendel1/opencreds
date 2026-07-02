@@ -1,5 +1,5 @@
 import type { CatalogStore } from "../catalog-store.ts";
-import type { OAuth2AuthDefinition } from "../core/types.ts";
+import type { OAuth2AuthDefinition, OAuthClientConfigFieldDefinition } from "../core/types.ts";
 
 import { normalizeCredentialValues } from "../core/credential-fields.ts";
 
@@ -11,6 +11,7 @@ export type OAuthClientConfig = {
   clientId: string;
   clientSecret: string;
   extra: Record<string, string>;
+  secretExtra: Record<string, string>;
 };
 
 /**
@@ -60,7 +61,7 @@ export class OAuthClientConfigService {
 
   async getConfig(service: string): Promise<OAuthClientConfig | undefined> {
     this.getOAuthDefinition(service);
-    return this.store.get(service);
+    return normalizeStoredOAuthClientConfig(await this.store.get(service));
   }
 
   async upsertConfig(input: {
@@ -68,6 +69,7 @@ export class OAuthClientConfigService {
     clientId: string;
     clientSecret: string;
     extra?: Record<string, unknown>;
+    secretExtra?: Record<string, unknown>;
   }): Promise<OAuthClientConfigSummary> {
     const auth = this.getOAuthDefinition(input.service);
     const clientId = input.clientId.trim();
@@ -79,16 +81,26 @@ export class OAuthClientConfigService {
       throw new OAuthClientConfigError("invalid_input", "clientSecret is required.");
     }
 
+    const submittedExtra = input.extra ?? {};
     const config: OAuthClientConfig = {
       service: input.service,
       clientId,
       clientSecret,
       extra: normalizeCredentialValues({
-        fields: auth.clientConfigFields ?? [],
-        values: input.extra ?? {},
+        fields: filterClientConfigFields(auth.clientConfigFields, "extra"),
+        values: pickClientConfigFieldValues(auth.clientConfigFields, submittedExtra, "extra"),
+        createError: (message) => new OAuthClientConfigError("invalid_input", message),
+      }),
+      secretExtra: normalizeCredentialValues({
+        fields: filterClientConfigFields(auth.clientConfigFields, "secretExtra"),
+        values: {
+          ...pickClientConfigFieldValues(auth.clientConfigFields, submittedExtra, "secretExtra"),
+          ...(input.secretExtra ?? {}),
+        },
         createError: (message) => new OAuthClientConfigError("invalid_input", message),
       }),
     };
+    assertNoUnexpectedClientConfigFields(auth.clientConfigFields, submittedExtra, input.secretExtra ?? {});
     await this.store.set(config);
     return this.toSummary(input.service, auth, config);
   }
@@ -102,6 +114,17 @@ export class OAuthClientConfigService {
   expectedRedirectUri(service: string): string {
     const auth = this.getOAuthDefinition(service);
     return `${this.origin}${auth.redirectPath}`;
+  }
+
+  resolveEndpointUrl(service: string, endpointUrl: string, config: OAuthClientConfig): string {
+    this.getOAuthDefinition(service);
+    return endpointUrl.replaceAll(/\{([A-Za-z0-9_]+)\}/g, (_match, key: string) => {
+      const value = config.extra[key];
+      if (!value) {
+        throw new OAuthClientConfigError("invalid_input", `${key} is required.`);
+      }
+      return encodeURIComponent(value);
+    });
   }
 
   getOAuthDefinition(service: string): OAuth2AuthDefinition {
@@ -150,4 +173,47 @@ export class OAuthClientConfigError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+function filterClientConfigFields(
+  fields: OAuthClientConfigFieldDefinition[] | undefined,
+  location: "extra" | "secretExtra",
+): OAuthClientConfigFieldDefinition[] {
+  return (fields ?? []).filter((field) => (field.location ?? "extra") === location);
+}
+
+function pickClientConfigFieldValues(
+  fields: OAuthClientConfigFieldDefinition[] | undefined,
+  values: Record<string, unknown>,
+  location: "extra" | "secretExtra",
+): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  for (const field of filterClientConfigFields(fields, location)) {
+    output[field.key] = values[field.key] ?? field.defaultValue;
+  }
+  return output;
+}
+
+function assertNoUnexpectedClientConfigFields(
+  fields: OAuthClientConfigFieldDefinition[] | undefined,
+  extra: Record<string, unknown>,
+  secretExtra: Record<string, unknown>,
+): void {
+  const keys = new Set((fields ?? []).map((field) => field.key));
+  for (const key of [...Object.keys(extra), ...Object.keys(secretExtra)]) {
+    if (!keys.has(key)) {
+      throw new OAuthClientConfigError("invalid_input", `Unexpected credential field: ${key}.`);
+    }
+  }
+}
+
+function normalizeStoredOAuthClientConfig(config: OAuthClientConfig | undefined): OAuthClientConfig | undefined {
+  if (!config) {
+    return undefined;
+  }
+
+  return {
+    ...config,
+    secretExtra: config.secretExtra ?? {},
+  };
 }

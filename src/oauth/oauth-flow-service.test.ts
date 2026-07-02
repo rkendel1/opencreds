@@ -37,6 +37,81 @@ const oauthProvider: ProviderDefinition = {
   actions: [],
 };
 
+const pkceOAuthProvider: ProviderDefinition = {
+  ...oauthProvider,
+  service: "pkce",
+  auth: [
+    {
+      type: "oauth2",
+      authorizationUrl: "https://pkce.example.com/oauth/authorize",
+      tokenUrl: "https://pkce.example.com/oauth/token",
+      scopes: ["read"],
+      redirectPath: "/oauth/callback/pkce",
+      tokenEndpointAuthMethod: "client_secret_basic",
+      pkce: {
+        method: "S256",
+      },
+      clientConfigFields: [
+        {
+          key: "appBearerToken",
+          label: "App Bearer Token",
+          inputType: "password",
+          required: false,
+          secret: true,
+          location: "secretExtra",
+        },
+      ],
+    },
+  ],
+};
+
+const customOAuthProvider: ProviderDefinition = {
+  ...oauthProvider,
+  service: "custom_oauth",
+  auth: [
+    {
+      type: "oauth2",
+      authorizationUrl: "https://example.com/{tenant}/authorize",
+      tokenUrl: "https://example.com/{tenant}/token",
+      refreshTokenUrl: "https://example.com/{tenant}/refresh",
+      scopes: ["read", "write"],
+      scopeSeparator: ",",
+      redirectPath: "/oauth/callback/custom_oauth",
+      tokenEndpointAuthMethod: "client_secret_post",
+      tokenRequestFormat: "json",
+      authorizationRequestFields: {
+        clientId: "app_id",
+        responseType: false,
+      },
+      tokenRequestFields: {
+        code: "auth_code",
+        clientId: "app_id",
+        clientSecret: "secret",
+        authorizationCode: {
+          grantType: false,
+          redirectUri: false,
+        },
+      },
+      tokenResponseEnvelope: {
+        dataField: "data",
+        codeField: "code",
+        successCode: 0,
+        messageField: "message",
+      },
+      clientConfigFields: [
+        {
+          key: "tenant",
+          label: "Tenant",
+          inputType: "text",
+          required: true,
+          secret: false,
+          defaultValue: "common",
+        },
+      ],
+    },
+  ],
+};
+
 describe("OAuthFlowService", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -124,6 +199,59 @@ describe("OAuthFlowService", () => {
     await expect(services.connections.getCredential("example")).resolves.toBeUndefined();
   });
 
+  it("stores secret OAuth client config fields in completed credential metadata", async () => {
+    const services = createServices([pkceOAuthProvider]);
+    await services.clientConfigs.upsertConfig({
+      service: "pkce",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      secretExtra: {
+        appBearerToken: " app-token ",
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ access_token: "access-token", token_type: "Bearer" })),
+    );
+
+    const started = await services.flow.startAuthorization({ service: "pkce" });
+    await services.flow.completeAuthorization({ state: started.state, code: "code" });
+
+    await expect(services.connections.getCredential("pkce")).resolves.toMatchObject({
+      authType: "oauth2",
+      metadata: {
+        oauthClientSecretExtra: {
+          appBearerToken: "app-token",
+        },
+      },
+    });
+  });
+
+  it("adds PKCE challenge and verifier for providers that require it", async () => {
+    const services = createServices([pkceOAuthProvider]);
+    await services.clientConfigs.upsertConfig({
+      service: "pkce",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+    });
+    const fetcher = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      Response.json({ access_token: "access-token", token_type: "Bearer" }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    const started = await services.flow.startAuthorization({ service: "pkce" });
+    const authorizationUrl = new URL(started.authorizationUrl);
+
+    expect(authorizationUrl.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
+    await services.flow.completeAuthorization({ state: started.state, code: "code" });
+
+    const tokenRequest = fetcher.mock.calls[0]?.[1] as RequestInit | undefined;
+    const tokenBody = tokenRequest?.body;
+    expect(tokenBody).toBeInstanceOf(URLSearchParams);
+    expect((tokenBody as URLSearchParams).get("code_verifier")).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
   it("accepts token responses that use token instead of access_token", async () => {
     const services = createServices([oauthProvider]);
     await services.clientConfigs.upsertConfig({
@@ -149,6 +277,62 @@ describe("OAuthFlowService", () => {
       authType: "oauth2",
       accessToken: "intercom-token",
     });
+  });
+
+  it("supports provider-specific authorization and token request shapes", async () => {
+    const services = createServices([customOAuthProvider]);
+    await services.clientConfigs.upsertConfig({
+      service: "custom_oauth",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+    });
+    const fetcher = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      Response.json({
+        code: 0,
+        data: {
+          access_token: "custom-access-token",
+          refresh_token: "custom-refresh-token",
+          token_type: "Bearer",
+          posthog_base_url: "https://eu.posthog.com",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    const started = await services.flow.startAuthorization({ service: "custom_oauth" });
+    const authorizationUrl = new URL(started.authorizationUrl);
+
+    expect(authorizationUrl.toString()).toContain("https://example.com/common/authorize");
+    expect(authorizationUrl.searchParams.get("app_id")).toBe("client-id");
+    expect(authorizationUrl.searchParams.has("client_id")).toBe(false);
+    expect(authorizationUrl.searchParams.has("response_type")).toBe(false);
+    expect(authorizationUrl.searchParams.get("scope")).toBe("read,write");
+
+    await services.flow.completeAuthorization({ state: started.state, code: "code" });
+    const tokenRequest = fetcher.mock.calls[0];
+    expect(tokenRequest?.[0]).toBe("https://example.com/common/token");
+    expect(JSON.parse(String(tokenRequest?.[1]?.body))).toEqual({
+      app_id: "client-id",
+      auth_code: "code",
+      secret: "client-secret",
+    });
+    await expect(services.connections.getCredential("custom_oauth")).resolves.toMatchObject({
+      authType: "oauth2",
+      accessToken: "custom-access-token",
+      refreshToken: "custom-refresh-token",
+      metadata: {
+        oauthClientExtra: {
+          tenant: "common",
+        },
+        posthog_base_url: "https://eu.posthog.com",
+      },
+    });
+    const credential = await services.connections.getCredential("custom_oauth");
+    expect(credential?.authType).toBe("oauth2");
+    if (credential?.authType === "oauth2") {
+      expect(credential.metadata).not.toHaveProperty("access_token");
+      expect(credential.metadata).not.toHaveProperty("refresh_token");
+    }
   });
 });
 

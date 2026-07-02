@@ -547,6 +547,7 @@ export class ConnectServer {
         clientId: optionalString(body.clientId) ?? "",
         clientSecret: optionalString(body.clientSecret) ?? "",
         extra: optionalRecord(body.extra),
+        secretExtra: optionalRecord(body.secretExtra),
       }),
     );
   }

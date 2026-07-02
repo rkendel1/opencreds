@@ -9,6 +9,16 @@ export const executors: ProviderExecutors = defineBearerProviderExecutors(
 );
 
 export const credentialValidators: CredentialValidators = {
+  oauth2(input, { fetcher }): ReturnType<typeof validateTikTokBusinessCredential> {
+    return validateTikTokBusinessCredential(
+      {
+        accessToken: input.accessToken,
+        metadata: input.metadata,
+      },
+      fetcher,
+    );
+  },
+
   apiKey(input, { fetcher }): ReturnType<typeof validateTikTokBusinessCredential> {
     return validateTikTokBusinessCredential(
       {

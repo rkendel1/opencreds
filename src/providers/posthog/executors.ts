@@ -1,7 +1,8 @@
 import type { CredentialValidators, ProviderExecutors } from "../../core/types.ts";
 import type { PosthogRuntimeContext } from "./runtime.ts";
 
-import { defineProviderExecutors, ProviderRequestError, requireApiKeyCredential } from "../provider-runtime.ts";
+import { optionalString } from "../../core/cast.ts";
+import { defineProviderExecutors, ProviderRequestError } from "../provider-runtime.ts";
 import { posthogActionHandlers, validatePosthogCredential } from "./runtime.ts";
 
 const service = "posthog";
@@ -27,7 +28,20 @@ export const executors: ProviderExecutors = defineProviderExecutors<PosthogRunti
   handlers: posthogExecutorHandlers,
   fallbackMessage: "PostHog request failed.",
   async createContext(context, fetcher): Promise<PosthogRuntimeContext> {
-    const credential = await requireApiKeyCredential(context, service);
+    const credential = await context.getCredential(service);
+    if (credential?.authType === "oauth2") {
+      return {
+        apiKey: credential.accessToken,
+        fetcher,
+        providerMetadata: {
+          ...credential.metadata,
+          baseUrl: optionalString(credential.metadata.posthog_base_url) ?? credential.metadata.baseUrl,
+        },
+      };
+    }
+    if (credential?.authType !== "api_key") {
+      throw new ProviderRequestError(401, "Connect posthog with OAuth or configure PostHog API key credentials first.");
+    }
     return {
       apiKey: credential.apiKey,
       fetcher,
@@ -41,6 +55,18 @@ export const executors: ProviderExecutors = defineProviderExecutors<PosthogRunti
 });
 
 export const credentialValidators: CredentialValidators = {
+  async oauth2(input, options) {
+    return validatePosthogCredential(
+      {
+        apiKey: input.accessToken,
+        values: {
+          baseUrl: optionalString(input.metadata.posthog_base_url) ?? "https://us.posthog.com",
+        },
+      },
+      options.fetcher,
+    );
+  },
+
   async apiKey(input, options) {
     try {
       return await validatePosthogCredential(input, options.fetcher);

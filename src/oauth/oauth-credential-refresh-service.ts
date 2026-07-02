@@ -33,10 +33,12 @@ export class OAuthCredentialRefreshService implements IOAuthCredentialRefresher 
     const refreshed = await requestRefreshToken({
       clientId: config.clientId,
       clientSecret: config.clientSecret,
+      responseEnvelope: auth.tokenResponseEnvelope,
       refreshToken: credential.refreshToken ?? "",
+      tokenRequestFields: auth.tokenRequestFields,
       tokenEndpointAuthMethod: auth.tokenEndpointAuthMethod,
       tokenRequestFormat: auth.tokenRequestFormat,
-      tokenUrl: auth.tokenUrl,
+      tokenUrl: this.clientConfigs.resolveEndpointUrl(service, auth.refreshTokenUrl ?? auth.tokenUrl, config),
       createError: (message) => new ConnectionError("oauth_token_refresh_failed", message),
     });
 

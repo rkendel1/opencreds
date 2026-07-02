@@ -61,6 +61,11 @@ const oauthClientConfigRequestSchema = jsonSchema.object(
       additionalProperties: { type: "string" },
       description: "Additional OAuth client config values keyed by provider-declared field ids.",
     },
+    secretExtra: {
+      type: "object",
+      additionalProperties: { type: "string" },
+      description: "Sensitive OAuth client config values keyed by provider-declared field ids.",
+    },
   },
   {
     required: ["clientId"],
