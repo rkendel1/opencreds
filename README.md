@@ -111,7 +111,14 @@ safe account labels, and execution results they need.
 
 ## Cloudflare Quick Start Video
 
-Coming soon: a YouTube walkthrough for launching a usable OpenConnector deployment on Cloudflare.
+[![Deploy OpenConnector on Cloudflare Workers](assets/cloudflare-quickstart-video.png)](https://www.youtube.com/watch?v=R0V1ZdCuTgc)
+
+Watch the
+[Cloudflare Workers deployment walkthrough](https://www.youtube.com/watch?v=R0V1ZdCuTgc) to launch
+OpenConnector on Cloudflare with Workers, D1, R2, and the Web Console. The video follows the same
+flow as [docs/cloudflare.md](docs/cloudflare.md): create Cloudflare resources, copy
+`wrangler.example.jsonc` to `wrangler.local.jsonc`, apply D1 migrations, set required secrets, and
+run `npm run deploy:cloudflare`.
 
 ## Quick Start
 
