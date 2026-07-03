@@ -2,6 +2,7 @@ import type { ActionDefinition, JsonSchema } from "../../core/types.ts";
 
 import { s } from "../../core/json-schema.ts";
 import { defineProviderAction } from "../../core/provider-definition.ts";
+import { blazeMeterResponseEnvelopeSchema } from "../blaze-meter-schemas.ts";
 
 const service = "blaze_meter_service_virtualization";
 
@@ -54,30 +55,6 @@ updateServiceMockTemplateInputSchema.anyOf = [
   "noMatchingRequestPreference",
 ].map((field) => ({ required: [field] }));
 
-const errorSchema = s.object(
-  "The error object returned by BlazeMeter when a request fails.",
-  {
-    code: s.nullable(s.integer("The numeric BlazeMeter error code.")),
-    message: s.nullable(s.string("The BlazeMeter error message.")),
-  },
-  { optional: ["code", "message"] },
-);
-
-const responseEnvelopeSchema = s.actionOutput(
-  {
-    apiVersion: s.nullable(s.integer("The BlazeMeter API version returned by the endpoint.")),
-    requestId: s.nullable(s.string("The BlazeMeter request identifier.")),
-    error: s.nullable(errorSchema),
-    result: s.unknown("The result payload returned by BlazeMeter."),
-    total: s.nullable(s.integer("The total number of matching records when returned.")),
-    limit: s.nullable(s.integer("The response limit when returned.")),
-    skip: s.nullable(s.integer("The response offset when returned.")),
-    hidden: s.nullable(s.integer("The number of hidden records when returned.")),
-    raw: s.looseObject("The raw BlazeMeter response object."),
-  },
-  "A normalized BlazeMeter API v4 response envelope.",
-);
-
 export type BlazeMeterServiceVirtualizationActionName =
   | "list_service_mock_templates"
   | "get_service_mock_template"
@@ -95,7 +72,7 @@ export const blazeMeterServiceVirtualizationActions: ActionDefinition[] = [
       ["workspaceId"],
       "Input for listing BlazeMeter Service Virtualization service mock templates.",
     ),
-    outputSchema: responseEnvelopeSchema,
+    outputSchema: blazeMeterResponseEnvelopeSchema,
   }),
   defineProviderAction(service, {
     name: "get_service_mock_template",
@@ -109,13 +86,13 @@ export const blazeMeterServiceVirtualizationActions: ActionDefinition[] = [
       ["workspaceId", "templateId"],
       "Input for retrieving one BlazeMeter service mock template.",
     ),
-    outputSchema: responseEnvelopeSchema,
+    outputSchema: blazeMeterResponseEnvelopeSchema,
   }),
   defineProviderAction(service, {
     name: "update_service_mock_template",
     description: "Update JSON-safe configuration fields for one BlazeMeter service mock template.",
     requiredScopes: [],
     inputSchema: updateServiceMockTemplateInputSchema,
-    outputSchema: responseEnvelopeSchema,
+    outputSchema: blazeMeterResponseEnvelopeSchema,
   }),
 ];
