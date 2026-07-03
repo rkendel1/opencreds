@@ -11,7 +11,7 @@ import type { FormEvent, ReactNode } from "react";
 
 import { useI18n, useLang, useTranslate } from "@embra/i18n/react";
 import { Activity, AppWindow, BookOpen, KeyRound, Loader2, RefreshCw, TerminalSquare } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router";
 import { AccessPage } from "./access-page";
 import { ActionsPage } from "./actions-page";
@@ -33,9 +33,65 @@ const navItems = [
   { path: "/resources", labelKey: "nav.docs", icon: BookOpen },
 ] as const;
 
-interface AuthSession {
+export interface AuthSession {
   adminAuthConfigured: boolean;
   authenticated: boolean;
+}
+
+export interface LogoutState {
+  authSession: AuthSession;
+}
+
+export function nextLogoutState(state: LogoutState, succeeded: boolean): LogoutState {
+  return succeeded
+    ? {
+        authSession: { ...state.authSession, authenticated: false },
+      }
+    : state;
+}
+
+export interface AuthLoadState {
+  pendingUnlockToken: string;
+  authSession: AuthSession;
+}
+
+export function nextAuthLoadState(state: AuthLoadState, session: AuthSession): AuthLoadState {
+  return {
+    pendingUnlockToken: session.authenticated ? "" : state.pendingUnlockToken,
+    authSession: session,
+  };
+}
+
+export interface RuntimeLoadResult {
+  authSession: AuthSession;
+  data: AppData;
+}
+
+export async function loadRuntimeData(unlockToken: string): Promise<RuntimeLoadResult> {
+  const authSession = await apiGet<AuthSession>("/api/auth/session", { bearerToken: unlockToken });
+  if (!authSession.authenticated) {
+    return { authSession, data: emptyData };
+  }
+
+  const [providers, connections, oauthConfigs, runtimeTokens, runPage] = await Promise.all([
+    apiGet<ProviderDefinition[]>("/api/providers"),
+    apiGet<ConnectionRecord[]>("/api/connections"),
+    apiGet<OAuthConfig[]>("/api/oauth/configs"),
+    apiGet<RuntimeTokenSummary[]>("/api/runtime-tokens"),
+    apiGet<RunLogPage>("/api/runs"),
+  ]);
+
+  return {
+    authSession,
+    data: {
+      providers,
+      connections,
+      oauthConfigs,
+      runtimeTokens,
+      runs: runPage.items,
+      runsNextCursor: runPage.nextCursor,
+    },
+  };
 }
 
 export function App(): ReactNode {
@@ -45,7 +101,7 @@ export function App(): ReactNode {
     adminAuthConfigured: false,
     authenticated: true,
   });
-  const [adminToken, setAdminToken] = useState("");
+  const pendingUnlockToken = useRef("");
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [runtimeChecked, setRuntimeChecked] = useState(false);
@@ -54,28 +110,23 @@ export function App(): ReactNode {
 
   useEffect(() => {
     let cancelled = false;
+    const requestUnlockToken = pendingUnlockToken.current;
     setLoading(true);
-    Promise.all([
-      apiGet<ProviderDefinition[]>("/api/providers", { adminToken }),
-      apiGet<ConnectionRecord[]>("/api/connections", { adminToken }),
-      apiGet<OAuthConfig[]>("/api/oauth/configs", { adminToken }),
-      apiGet<RuntimeTokenSummary[]>("/api/runtime-tokens", { adminToken }),
-      apiGet<RunLogPage>("/api/runs", { adminToken }),
-      apiGet<AuthSession>("/api/auth/session", { adminToken }),
-    ])
-      .then(([providers, connections, oauthConfigs, runtimeTokens, runPage, session]) => {
+    loadRuntimeData(requestUnlockToken)
+      .then(({ authSession: session, data: nextData }) => {
         if (!cancelled) {
-          setData({
-            providers,
-            connections,
-            oauthConfigs,
-            runtimeTokens,
-            runs: runPage.items,
-            runsNextCursor: runPage.nextCursor,
-          });
-          setAuthSession(session);
-          setLocked(false);
-          setError(null);
+          const nextAuth = nextAuthLoadState(
+            {
+              pendingUnlockToken: pendingUnlockToken.current,
+              authSession,
+            },
+            session,
+          );
+          pendingUnlockToken.current = nextAuth.pendingUnlockToken;
+          setData(nextData);
+          setAuthSession(nextAuth.authSession);
+          setLocked(!session.authenticated);
+          setError(session.authenticated ? null : requestUnlockToken.trim() ? t("shell.invalidUnlockToken") : null);
         }
       })
       .catch((caught: unknown) => {
@@ -83,10 +134,11 @@ export function App(): ReactNode {
           return;
         }
         if (caught instanceof ApiError && caught.status === 401) {
+          pendingUnlockToken.current = "";
           setData(emptyData);
           setAuthSession({ adminAuthConfigured: true, authenticated: false });
           setLocked(true);
-          setError(adminToken.trim() ? t("shell.invalidAdminToken") : null);
+          setError(requestUnlockToken.trim() ? t("shell.invalidUnlockToken") : null);
           return;
         }
         setError(caught instanceof Error ? caught.message : t("shell.loadRuntimeFailed"));
@@ -101,26 +153,29 @@ export function App(): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [adminToken, refreshToken, t]);
+  }, [refreshToken, t]);
 
   function refresh(): void {
     setRefreshToken((value) => value + 1);
   }
 
   function unlock(token: string): void {
-    setAdminToken(token);
+    pendingUnlockToken.current = token;
     setLocked(false);
     setError(null);
     refresh();
   }
 
   function logout(): void {
-    void apiPost("/api/auth/logout", {}, { adminToken })
-      .catch(() => undefined)
-      .finally(() => {
-        setAdminToken("");
-        setAuthSession((session) => ({ ...session, authenticated: false }));
+    void apiPost("/api/auth/logout", {})
+      .then(() => {
+        const next = nextLogoutState({ authSession }, true);
+        setAuthSession(next.authSession);
+        setError(null);
         refresh();
+      })
+      .catch((caught: unknown) => {
+        setError(caught instanceof Error ? caught.message : t("shell.logoutFailed"));
       });
   }
 
@@ -135,7 +190,6 @@ export function App(): ReactNode {
   return (
     <AppShell
       data={data}
-      adminToken={adminToken}
       showLogout={authSession.adminAuthConfigured && authSession.authenticated}
       loading={loading}
       error={error}
@@ -160,7 +214,6 @@ function InitialLoadingView(): ReactNode {
 
 function AppShell(props: {
   data: AppData;
-  adminToken: string;
   showLogout: boolean;
   loading: boolean;
   error: string | null;
@@ -239,37 +292,17 @@ function AppShell(props: {
         <Routes>
           <Route index element={<Navigate to="/overview" replace />} />
           <Route path="/overview" element={<OverviewPage data={props.data} onRefresh={props.onRefresh} />} />
-          <Route
-            path="/providers"
-            element={<ProvidersPage data={props.data} adminToken={props.adminToken} onRefresh={props.onRefresh} />}
-          />
-          <Route
-            path="/providers/:service"
-            element={<ProvidersPage data={props.data} adminToken={props.adminToken} onRefresh={props.onRefresh} />}
-          />
-          <Route
-            path="/actions"
-            element={<ActionsPage data={props.data} adminToken={props.adminToken} onRefresh={props.onRefresh} />}
-          />
-          <Route
-            path="/actions/:actionId"
-            element={<ActionsPage data={props.data} adminToken={props.adminToken} onRefresh={props.onRefresh} />}
-          />
+          <Route path="/providers" element={<ProvidersPage data={props.data} onRefresh={props.onRefresh} />} />
+          <Route path="/providers/:service" element={<ProvidersPage data={props.data} onRefresh={props.onRefresh} />} />
+          <Route path="/actions" element={<ActionsPage data={props.data} onRefresh={props.onRefresh} />} />
+          <Route path="/actions/:actionId" element={<ActionsPage data={props.data} onRefresh={props.onRefresh} />} />
           <Route
             path="/runs"
-            element={
-              <RunsPage
-                initialRuns={props.data.runs}
-                nextCursor={props.data.runsNextCursor}
-                adminToken={props.adminToken}
-              />
-            }
+            element={<RunsPage initialRuns={props.data.runs} nextCursor={props.data.runsNextCursor} />}
           />
           <Route
             path="/access"
-            element={
-              <AccessPage tokens={props.data.runtimeTokens} adminToken={props.adminToken} onRefresh={props.onRefresh} />
-            }
+            element={<AccessPage tokens={props.data.runtimeTokens} onRefresh={props.onRefresh} />}
           />
           <Route path="/resources" element={<ResourcesPage actions={actions} />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
@@ -301,7 +334,7 @@ function UnlockView(props: { loading: boolean; message: string | null; onUnlock(
         <LanguageSelect />
         <form className="form-grid" onSubmit={submit}>
           <label className="field">
-            <span>{t("unlock.adminToken")}</span>
+            <span>{t("unlock.token")}</span>
             <input
               type="password"
               value={token}

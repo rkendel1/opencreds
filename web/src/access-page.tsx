@@ -11,7 +11,6 @@ import { Badge, EmptyState } from "./shared-ui";
 
 interface AccessPageProps {
   tokens: RuntimeTokenSummary[];
-  adminToken?: string;
   onRefresh(): void;
 }
 
@@ -43,11 +42,7 @@ export function AccessPage(props: AccessPageProps): ReactNode {
     setStatus(t("access.creating"));
     setCreated(null);
     try {
-      const result = await apiPost<RuntimeTokenCreation>(
-        "/api/runtime-tokens",
-        { name },
-        { adminToken: props.adminToken },
-      );
+      const result = await apiPost<RuntimeTokenCreation>("/api/runtime-tokens", { name });
       setCreated(result);
       setName("");
       setStatus(t("access.created"));
@@ -60,7 +55,7 @@ export function AccessPage(props: AccessPageProps): ReactNode {
   async function revoke(id: string): Promise<void> {
     setStatus(t("access.revoking"));
     try {
-      await apiDelete(`/api/runtime-tokens/${id}`, { adminToken: props.adminToken });
+      await apiDelete(`/api/runtime-tokens/${id}`);
       setStatus(t("access.revoked"));
       props.onRefresh();
     } catch (error) {

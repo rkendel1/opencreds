@@ -8,7 +8,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
-  adminToken?: string;
+  bearerToken?: string;
 }
 
 export async function apiGet<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -57,7 +57,7 @@ function headersFor(options: RequestOptions, json = false): Headers {
   if (json) {
     headers.set("content-type", "application/json");
   }
-  const token = options.adminToken?.trim();
+  const token = options.bearerToken?.trim();
   if (token) {
     headers.set("authorization", `Bearer ${token}`);
   }

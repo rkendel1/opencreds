@@ -80,6 +80,7 @@ const followUpAction: ActionDefinition = {
 };
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -670,6 +671,7 @@ describe("ConnectServer", () => {
       expect(authorized.status).toBe(200);
       expect(authorized.headers.get("set-cookie")).toContain("oomol_connect_admin_session=");
       expect(authorized.headers.get("set-cookie")).not.toContain("local-token");
+      expect(authorized.headers.get("set-cookie")).toContain("Max-Age=2592000");
 
       const logout = await app.request("/api/auth/logout", { method: "POST" });
       expect(logout.status).toBe(200);
@@ -696,6 +698,8 @@ describe("ConnectServer", () => {
       headers: { authorization: "Bearer local-token" },
     });
     expect(bearer.status).toBe(200);
+    expect(bearer.headers.get("set-cookie")).toContain("oomol_connect_admin_session=");
+    expect(bearer.headers.get("set-cookie")).not.toContain("local-token");
     await expect(bearer.json()).resolves.toEqual({
       adminAuthConfigured: true,
       authenticated: true,
@@ -712,6 +716,30 @@ describe("ConnectServer", () => {
     await expect(cookieSession.json()).resolves.toEqual({
       adminAuthConfigured: true,
       authenticated: true,
+    });
+  });
+
+  it("expires local admin auth sessions", async () => {
+    const issuedAt = Date.parse("2026-07-03T00:00:00.000Z");
+    const now = vi.spyOn(Date, "now").mockReturnValue(issuedAt);
+    const app = createTestServer([apiKeyProvider], {
+      auth: { adminToken: "local-token" },
+    }).createApp();
+
+    const authorized = await app.request("/api/providers", {
+      headers: { authorization: "Bearer local-token" },
+    });
+    const cookie = authorized.headers.get("set-cookie")?.split(";")[0] ?? "";
+
+    now.mockReturnValue(issuedAt + 2_592_000_000 + 1);
+    const expiredSession = await app.request("/api/auth/session", {
+      headers: { cookie },
+    });
+
+    expect(expiredSession.status).toBe(200);
+    await expect(expiredSession.json()).resolves.toEqual({
+      adminAuthConfigured: true,
+      authenticated: false,
     });
   });
 

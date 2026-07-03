@@ -11,7 +11,6 @@ import { Badge, EmptyState, InfoBlock, ProviderIcon, TagList } from "./shared-ui
 
 interface ProvidersPageProps {
   data: AppData;
-  adminToken?: string;
   onRefresh(): void;
 }
 
@@ -19,7 +18,6 @@ interface ProviderDetailProps {
   provider: ProviderDefinition;
   connection?: AppData["connections"][number];
   oauthConfig?: OAuthConfig;
-  adminToken?: string;
   onRefresh(): void;
 }
 
@@ -28,7 +26,6 @@ interface ConnectionFormProps {
   auth: AuthDefinition;
   connection?: AppData["connections"][number];
   oauthConfig?: OAuthConfig;
-  adminToken?: string;
   onRefresh(): void;
   onConfigureOAuthClient(): void;
 }
@@ -36,7 +33,6 @@ interface ConnectionFormProps {
 interface OAuthConfigFormProps {
   provider: ProviderDefinition;
   config?: OAuthConfig;
-  adminToken?: string;
   onRefresh(): void;
 }
 
@@ -175,7 +171,6 @@ export function ProvidersPage(props: ProvidersPageProps): ReactNode {
               provider={selectedProvider}
               connection={connectionsByService.get(selectedProvider.service)}
               oauthConfig={oauthConfigForProvider(props.data.oauthConfigs, selectedProvider.service)}
-              adminToken={props.adminToken}
               onRefresh={props.onRefresh}
             />
           ) : (
@@ -278,7 +273,6 @@ function ProviderDetail(props: ProviderDetailProps): ReactNode {
             auth={selectedAuth}
             connection={props.connection}
             oauthConfig={props.oauthConfig}
-            adminToken={props.adminToken}
             onRefresh={props.onRefresh}
             onConfigureOAuthClient={() => setOAuthClientExpanded(true)}
           />
@@ -299,7 +293,6 @@ function ProviderDetail(props: ProviderDetailProps): ReactNode {
             config={props.oauthConfig}
             expanded={oauthClientExpanded}
             onToggle={() => setOAuthClientExpanded((value) => !value)}
-            adminToken={props.adminToken}
             onRefresh={props.onRefresh}
           />
         </div>
@@ -431,33 +424,19 @@ function ConnectionForm(props: ConnectionFormProps): ReactNode {
     );
     try {
       if (props.auth.type === "no_auth") {
-        await apiPut(
-          `/api/connections/${props.provider.service}`,
-          { authType: "no_auth" },
-          { adminToken: props.adminToken },
-        );
+        await apiPut(`/api/connections/${props.provider.service}`, { authType: "no_auth" });
       } else if (props.auth.type === "api_key") {
-        await apiPut(
-          `/api/connections/${props.provider.service}`,
-          { authType: "api_key", values },
-          { adminToken: props.adminToken },
-        );
+        await apiPut(`/api/connections/${props.provider.service}`, { authType: "api_key", values });
       } else if (props.auth.type === "custom_credential") {
-        await apiPut(
-          `/api/connections/${props.provider.service}`,
-          { authType: "custom_credential", values },
-          { adminToken: props.adminToken },
-        );
+        await apiPut(`/api/connections/${props.provider.service}`, { authType: "custom_credential", values });
       } else {
         if (!canSubmit) {
           setStatus(t("providers.connectionMessages.configureOAuthFirst"));
           return;
         }
-        const result = await apiPost<{ authorizationUrl?: string }>(
-          `/api/oauth/authorizations`,
-          { service: props.provider.service },
-          { adminToken: props.adminToken },
-        );
+        const result = await apiPost<{ authorizationUrl?: string }>(`/api/oauth/authorizations`, {
+          service: props.provider.service,
+        });
         if (result.authorizationUrl) {
           window.open(
             result.authorizationUrl,
@@ -483,7 +462,7 @@ function ConnectionForm(props: ConnectionFormProps): ReactNode {
   async function disconnect(): Promise<void> {
     setStatus(t("providers.connectionMessages.disconnecting"));
     try {
-      await apiDelete(`/api/connections/${props.provider.service}`, { adminToken: props.adminToken });
+      await apiDelete(`/api/connections/${props.provider.service}`);
       setStatus(t("providers.connectionMessages.disconnected"));
       props.onRefresh();
     } catch (error) {
@@ -542,7 +521,6 @@ function OAuthClientSettings(props: {
   auth: AuthDefinition;
   config?: OAuthConfig;
   expanded: boolean;
-  adminToken?: string;
   onToggle(): void;
   onRefresh(): void;
 }): ReactNode {
@@ -577,12 +555,7 @@ function OAuthClientSettings(props: {
       </div>
       {shouldShowOAuthClientForm(props.auth, props.expanded) ? (
         <div className="oauth-client-editor">
-          <OAuthConfigForm
-            provider={props.provider}
-            config={props.config}
-            adminToken={props.adminToken}
-            onRefresh={props.onRefresh}
-          />
+          <OAuthConfigForm provider={props.provider} config={props.config} onRefresh={props.onRefresh} />
         </div>
       ) : null}
     </div>
@@ -605,15 +578,11 @@ function OAuthConfigForm(props: OAuthConfigFormProps): ReactNode {
     event.preventDefault();
     setStatus(t("providers.oauthClientSettings.saving"));
     try {
-      await apiPut(
-        `/api/oauth/configs/${props.provider.service}`,
-        {
-          clientId,
-          clientSecret,
-          extra: {},
-        },
-        { adminToken: props.adminToken },
-      );
+      await apiPut(`/api/oauth/configs/${props.provider.service}`, {
+        clientId,
+        clientSecret,
+        extra: {},
+      });
       setStatus(t("providers.oauthClientSettings.saved"));
       props.onRefresh();
     } catch (error) {

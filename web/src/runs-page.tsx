@@ -11,7 +11,6 @@ import { Badge, EmptyState, InlineError } from "./shared-ui";
 interface RunsPageProps {
   initialRuns: RunLog[];
   nextCursor?: string;
-  adminToken?: string;
 }
 
 export function RunsPage(props: RunsPageProps): ReactNode {
@@ -36,7 +35,7 @@ export function RunsPage(props: RunsPageProps): ReactNode {
     setRunsError(null);
     try {
       const query = new URLSearchParams({ limit: "50", cursor: nextCursor });
-      const page = await apiGet<RunLogPage>(`/api/runs?${query}`, { adminToken: props.adminToken });
+      const page = await apiGet<RunLogPage>(`/api/runs?${query}`);
       setRuns((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (caught) {

@@ -11,14 +11,12 @@ import { Badge, EmptyState, TagList } from "./shared-ui";
 
 interface ActionsPageProps {
   data: AppData;
-  adminToken?: string;
   onRefresh(): void;
 }
 
 interface ActionDetailProps {
   action: ActionDefinition;
   providerName: string;
-  adminToken?: string;
   onRefresh(): void;
 }
 
@@ -160,7 +158,6 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
             <ActionDetail
               action={selectedAction}
               providerName={providerNames.get(selectedAction.service) ?? selectedAction.service}
-              adminToken={props.adminToken}
               onRefresh={props.onRefresh}
             />
           ) : (
@@ -233,12 +230,7 @@ function ActionDetail(props: ActionDetailProps): ReactNode {
       <ParameterList schema={props.action.inputSchema} />
       <ExampleTabs action={props.action} examples={examples} />
       {debugOpen ? (
-        <RunActionModal
-          action={props.action}
-          adminToken={props.adminToken}
-          onRefresh={props.onRefresh}
-          onClose={() => setDebugOpen(false)}
-        />
+        <RunActionModal action={props.action} onRefresh={props.onRefresh} onClose={() => setDebugOpen(false)} />
       ) : null}
     </>
   );
@@ -333,12 +325,7 @@ function ExampleTabs(props: ExampleTabsProps): ReactNode {
   );
 }
 
-function RunActionModal(props: {
-  action: ActionDefinition;
-  adminToken?: string;
-  onRefresh(): void;
-  onClose(): void;
-}): ReactNode {
+function RunActionModal(props: { action: ActionDefinition; onRefresh(): void; onClose(): void }): ReactNode {
   const t = useTranslate();
   const [input, setInput] = useState(() => exampleInput(props.action.inputSchema));
   const [result, setResult] = useState<ExecutionResult | null>(null);
@@ -362,7 +349,7 @@ function RunActionModal(props: {
       const parsed = input.trim() ? (JSON.parse(input) as unknown) : {};
       const response = await fetch(`/v1/actions/${props.action.id}`, {
         method: "POST",
-        headers: actionRunHeaders(props.adminToken),
+        headers: new Headers({ "content-type": "application/json" }),
         credentials: "same-origin",
         body: JSON.stringify({ input: parsed }),
       });
@@ -462,13 +449,4 @@ function buildAgentPrompt(action: ActionDefinition): { prompt: string } {
   ].join("\n");
 
   return { prompt };
-}
-
-function actionRunHeaders(adminToken: string | undefined): Headers {
-  const headers = new Headers({ "content-type": "application/json" });
-  const token = adminToken?.trim();
-  if (token) {
-    headers.set("authorization", `Bearer ${token}`);
-  }
-  return headers;
 }

@@ -6,6 +6,8 @@ import { jsonError } from "./http-utils.ts";
 
 const authCookieName = "oomol_connect_admin_session";
 const authCookieVersion = "v1";
+const authCookieMaxAgeSeconds = 2_592_000;
+const authCookieMaxAgeMs = authCookieMaxAgeSeconds * 1000;
 
 /**
  * Optional local API authentication for HTTP, web console, and MCP callers.
@@ -66,6 +68,7 @@ async function installLocalAuthCookie(context: Context, options: LocalAuthOption
 
   setCookie(context, authCookieName, await createAuthCookieValue(token), {
     httpOnly: true,
+    maxAge: authCookieMaxAgeSeconds,
     sameSite: "Strict",
     secure: context.req.url.startsWith("https://"),
     path: "/",
@@ -90,9 +93,14 @@ export async function readLocalAuthSession(context: Context, options: LocalAuthO
     return { adminAuthConfigured: false, authenticated: true };
   }
 
+  const authenticated = await hasRequestToken(context, adminToken);
+  if (authenticated) {
+    await installAdminCookieForBearer(context, options);
+  }
+
   return {
     adminAuthConfigured: true,
-    authenticated: await hasRequestToken(context, adminToken),
+    authenticated,
   };
 }
 
@@ -144,6 +152,11 @@ async function hasValidAuthCookie(context: Context, token: string): Promise<bool
 
   const [version, issuedAt, nonce, signature, ...extra] = cookie.split(".");
   if (version !== authCookieVersion || !issuedAt || !nonce || !signature || extra.length > 0) {
+    return false;
+  }
+
+  const issuedAtMs = Number(issuedAt);
+  if (!Number.isFinite(issuedAtMs) || issuedAtMs > Date.now() || Date.now() - issuedAtMs > authCookieMaxAgeMs) {
     return false;
   }
 
