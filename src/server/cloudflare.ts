@@ -1,13 +1,15 @@
 import type { CatalogStore } from "../catalog-store.ts";
+import type { AssetsBinding } from "./cloudflare/cloudflare-bindings.ts";
 import type { CloudflareEnv } from "./cloudflare/cloudflare-env.ts";
 import type { ConnectApp } from "./connect-app.ts";
+import type { Logger } from "./logger.ts";
 import type { ISecretCodec } from "./secrets/secret-codec-core.ts";
 
-import { loadCatalog } from "../catalog-store.ts";
 import { ActionPolicyService, parseActionPolicyList } from "../core/action-policy.ts";
 import { ProviderLoader } from "../providers/provider-loader.ts";
 import { executableActionIds } from "../providers/registry.generated.ts";
 import { isConsoleShellPath } from "./api/console-paths.ts";
+import { loadCatalogFromAssets } from "./cloudflare/catalog-assets.ts";
 import { readPositiveInteger, resolvePublicOrigin } from "./cloudflare/cloudflare-env.ts";
 import { createConnectApp } from "./connect-app.ts";
 import { R2TransitFileService } from "./files/r2-transit-files.ts";
@@ -42,9 +44,14 @@ export default {
 };
 
 async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Promise<ConnectApp> {
+  const assets = env.ASSETS;
+  if (!assets) {
+    throw new Error("Cloudflare ASSETS binding is required to load the catalog");
+  }
+
   const secretCodec = await createSecretCodec(env.OOMOL_CONNECT_ENCRYPTION_KEY);
   return await createConnectApp({
-    catalog: await loadCatalogOnce(),
+    catalog: await loadCatalogOnce(assets),
     providerLoader: new ProviderLoader(),
     runtimeDatabase: new D1RuntimeDatabase(env.DB, { secretCodec }),
     transitFiles: new R2TransitFileService({
@@ -61,12 +68,31 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
       allowedActions: parseActionPolicyList(env.OOMOL_CONNECT_ALLOWED_ACTIONS),
       blockedActions: parseActionPolicyList(env.OOMOL_CONNECT_BLOCKED_ACTIONS),
     }),
+    logger: workerLogger,
     computeRuntimeAuthConfigured: false,
   });
 }
 
-function loadCatalogOnce(): Promise<CatalogStore> {
-  catalogPromise ??= loadCatalog("/bundle/catalog/apps", {
+const workerLogger = {
+  error: writeWorkerLog("error"),
+  info: writeWorkerLog("info"),
+  warn: writeWorkerLog("warn"),
+} as unknown as Logger;
+
+function writeWorkerLog(level: "error" | "info" | "warn"): (fields: unknown, message?: string) => void {
+  return (fields, message) => {
+    const write = level === "error" ? console.error : level === "warn" ? console.warn : console.info;
+    if (message) {
+      write(message, fields);
+      return;
+    }
+
+    write(fields);
+  };
+}
+
+function loadCatalogOnce(assets: AssetsBinding): Promise<CatalogStore> {
+  catalogPromise ??= loadCatalogFromAssets(assets, {
     executableActionIds: Object.values(executableActionIds).flat(),
   });
   return catalogPromise;
@@ -94,5 +120,6 @@ function createCacheKey(env: CloudflareEnv, publicOrigin: string): string {
 }
 
 function shouldServeAsset(request: Request): boolean {
-  return isConsoleShellPath(new URL(request.url).pathname);
+  const { pathname } = new URL(request.url);
+  return !pathname.startsWith("/catalog") && isConsoleShellPath(pathname);
 }

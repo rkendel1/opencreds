@@ -1,6 +1,7 @@
 import type { RunLog, RunLogPage } from "./model";
 import type { ReactNode } from "react";
 
+import { useTranslate } from "@embra/i18n/react";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiGet } from "./api";
@@ -14,6 +15,7 @@ interface RunsPageProps {
 }
 
 export function RunsPage(props: RunsPageProps): ReactNode {
+  const t = useTranslate();
   const [runs, setRuns] = useState(props.initialRuns);
   const [nextCursor, setNextCursor] = useState(props.nextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -38,14 +40,14 @@ export function RunsPage(props: RunsPageProps): ReactNode {
       setRuns((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (caught) {
-      setRunsError(caught instanceof Error ? caught.message : "Failed to load more runs.");
+      setRunsError(caught instanceof Error ? caught.message : t("runs.loadMoreFailed"));
     } finally {
       setLoadingMore(false);
     }
   }
 
   if (runs.length === 0) {
-    return <EmptyState title="No runs yet" description="Run an action to see recent execution history." />;
+    return <EmptyState title={t("runs.noRunsTitle")} description={t("runs.noRunsDescription")} />;
   }
 
   return (
@@ -54,13 +56,13 @@ export function RunsPage(props: RunsPageProps): ReactNode {
         <table>
           <thead>
             <tr>
-              <th>Action</th>
-              <th>Caller</th>
-              <th>Status</th>
-              <th>Started</th>
-              <th>Duration</th>
-              <th>Input</th>
-              <th>Error</th>
+              <th>{t("runs.table.action")}</th>
+              <th>{t("runs.table.caller")}</th>
+              <th>{t("runs.table.status")}</th>
+              <th>{t("runs.table.started")}</th>
+              <th>{t("runs.table.duration")}</th>
+              <th>{t("runs.table.input")}</th>
+              <th>{t("runs.table.error")}</th>
             </tr>
           </thead>
           <tbody>
@@ -68,7 +70,13 @@ export function RunsPage(props: RunsPageProps): ReactNode {
               <tr key={run.id}>
                 <td className="mono">{run.actionId}</td>
                 <td className="mono">{run.caller}</td>
-                <td>{run.ok ? <Badge tone="success">Success</Badge> : <Badge tone="error">Failed</Badge>}</td>
+                <td>
+                  {run.ok ? (
+                    <Badge tone="success">{t("common.success")}</Badge>
+                  ) : (
+                    <Badge tone="error">{t("common.failed")}</Badge>
+                  )}
+                </td>
                 <td>{formatDate(run.startedAt)}</td>
                 <td>{formatDuration(run)}</td>
                 <td className="mono">{compactJson(run.inputSummary)}</td>
@@ -83,7 +91,7 @@ export function RunsPage(props: RunsPageProps): ReactNode {
         <div className="table-footer">
           <button className="secondary-button compact" onClick={() => void loadMoreRuns()} disabled={loadingMore}>
             {loadingMore ? <Loader2 size={14} className="spin" /> : null}
-            Load more
+            {t("runs.loadMore")}
           </button>
         </div>
       ) : null}

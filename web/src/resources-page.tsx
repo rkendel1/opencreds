@@ -1,6 +1,7 @@
 import type { ActionDefinition } from "./model";
 import type { ReactNode } from "react";
 
+import { useTranslate } from "@embra/i18n/react";
 import { BookOpen, ExternalLink, Link2, TerminalSquare } from "lucide-react";
 
 interface ResourcesPageProps {
@@ -15,24 +16,25 @@ interface DocCardProps {
 }
 
 export function ResourcesPage(props: ResourcesPageProps): ReactNode {
+  const t = useTranslate();
   return (
     <div className="docs-grid">
       <DocCard
         icon={<BookOpen size={20} />}
-        title="API Reference"
-        description="Browse the local runtime routes in Scalar."
+        title={t("resources.apiReference.title")}
+        description={t("resources.apiReference.description")}
         href="/docs"
       />
       <DocCard
         icon={<TerminalSquare size={20} />}
-        title="MCP Tools"
-        description={`${props.actions.length} actions exposed as local tools.`}
+        title={t("resources.mcpTools.title")}
+        description={t("resources.mcpTools.description", { count: props.actions.length })}
         href="/mcp/tools"
       />
       <DocCard
         icon={<Link2 size={20} />}
-        title="OpenAPI JSON"
-        description="Use the generated spec from scripts or tool importers."
+        title={t("resources.openapi.title")}
+        description={t("resources.openapi.description")}
         href="/openapi.json"
       />
     </div>

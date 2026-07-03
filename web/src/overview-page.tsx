@@ -1,6 +1,7 @@
 import type { AppData } from "./model";
 import type { ReactNode } from "react";
 
+import { useTranslate } from "@embra/i18n/react";
 import { Activity, AppWindow, FileText, KeyRound, PlugZap, RefreshCw, TerminalSquare } from "lucide-react";
 import { Link } from "react-router";
 import { compactJson, createOverviewSummary, formatDate, formatDuration } from "./model";
@@ -12,6 +13,7 @@ interface OverviewPageProps {
 }
 
 export function OverviewPage(props: OverviewPageProps): ReactNode {
+  const t = useTranslate();
   const summary = createOverviewSummary(props.data);
   const recentRuns = props.data.runs.slice(0, 6);
 
@@ -19,62 +21,74 @@ export function OverviewPage(props: OverviewPageProps): ReactNode {
     <div className="page-stack">
       <section className="runtime-strip">
         <div>
-          <strong>Runtime ready</strong>
-          <span>{summary.connectedCount} connected providers</span>
+          <strong>{t("overview.runtimeReady")}</strong>
+          <span>{t("overview.connectedProviders", { count: summary.connectedCount })}</span>
         </div>
         <button className="secondary-button compact" onClick={props.onRefresh}>
           <RefreshCw size={15} />
-          Refresh
+          {t("common.refresh")}
         </button>
       </section>
 
       <section className="metrics">
-        <Metric label="Providers" value={summary.providerCount} />
-        <Metric label="Actions" value={summary.actionCount} />
-        <Metric label="Connected" value={summary.connectedCount} />
-        <Metric label="Tokens" value={summary.activeTokenCount} />
+        <Metric label={t("overview.metrics.providers")} value={summary.providerCount} />
+        <Metric label={t("overview.metrics.actions")} value={summary.actionCount} />
+        <Metric label={t("overview.metrics.connected")} value={summary.connectedCount} />
+        <Metric label={t("overview.metrics.tokens")} value={summary.activeTokenCount} />
       </section>
 
       <section className="content-grid">
         <div className="detail-panel">
           <div className="section-heading-row">
-            <h2>Connection Health</h2>
+            <h2>{t("overview.connectionHealth")}</h2>
             <Link className="secondary-link" to="/providers">
               <PlugZap size={15} />
-              Providers
+              {t("nav.providers")}
             </Link>
           </div>
           <div className="section-grid">
-            <InfoBlock icon={<AppWindow size={18} />} label="Catalog" value={`${summary.providerCount} providers`} />
-            <InfoBlock icon={<PlugZap size={18} />} label="Connected" value={`${summary.connectedCount} active`} />
+            <InfoBlock
+              icon={<AppWindow size={18} />}
+              label={t("overview.metrics.providers")}
+              value={t("overview.catalogValue", { count: summary.providerCount })}
+            />
+            <InfoBlock
+              icon={<PlugZap size={18} />}
+              label={t("overview.metrics.connected")}
+              value={t("overview.connectedValue", { count: summary.connectedCount })}
+            />
             <InfoBlock
               icon={<TerminalSquare size={18} />}
-              label="Executable"
-              value={`${props.data.providers.flatMap((provider) => provider.actions).filter((action) => action.execution.locallyExecutable).length} actions`}
+              label={t("overview.executable")}
+              value={t("overview.executableValue", {
+                count: props.data.providers
+                  .flatMap((provider) => provider.actions)
+                  .filter((action) => action.execution.locallyExecutable).length,
+              })}
             />
           </div>
         </div>
 
         <div className="detail-panel">
           <div className="section-heading-row">
-            <h2>Common Entries</h2>
+            <h2>{t("overview.commonEntries")}</h2>
           </div>
           <div className="quick-link-grid">
             <Link className="quick-link" to="/providers">
               <PlugZap size={16} />
-              Connect provider
+              {t("overview.connectProvider")}
             </Link>
             <Link className="quick-link" to="/actions">
               <TerminalSquare size={16} />
-              Search actions
+              {t("overview.searchActions")}
             </Link>
             <Link className="quick-link" to="/access">
               <KeyRound size={16} />
-              Create token
+              {t("overview.createToken")}
             </Link>
             <Link className="quick-link" to="/resources">
               <FileText size={16} />
-              Open docs
+              {t("overview.openDocs")}
             </Link>
           </div>
         </div>
@@ -83,11 +97,11 @@ export function OverviewPage(props: OverviewPageProps): ReactNode {
       <section className="content-grid">
         <div className="table-panel">
           <div className="table-panel-heading">
-            <h2>Recent Failures</h2>
+            <h2>{t("overview.recentFailures")}</h2>
             <Badge tone={summary.failedRuns.length ? "error" : "success"}>{summary.failedRuns.length}</Badge>
           </div>
           {summary.failedRuns.length === 0 ? (
-            <EmptyState title="No failed runs" description="Recent action runs are clean." />
+            <EmptyState title={t("overview.noFailedRunsTitle")} description={t("overview.noFailedRunsDescription")} />
           ) : (
             <RunSummaryTable runs={summary.failedRuns} />
           )}
@@ -95,14 +109,14 @@ export function OverviewPage(props: OverviewPageProps): ReactNode {
 
         <div className="table-panel">
           <div className="table-panel-heading">
-            <h2>Recent Runs</h2>
+            <h2>{t("overview.recentRuns")}</h2>
             <Link className="secondary-link" to="/runs">
               <Activity size={15} />
-              Runs
+              {t("nav.runs")}
             </Link>
           </div>
           {recentRuns.length === 0 ? (
-            <EmptyState title="No runs yet" description="Run an action to see execution history." />
+            <EmptyState title={t("overview.noRunsTitle")} description={t("overview.noRunsDescription")} />
           ) : (
             <RunSummaryTable runs={recentRuns} />
           )}
@@ -113,22 +127,29 @@ export function OverviewPage(props: OverviewPageProps): ReactNode {
 }
 
 function RunSummaryTable(props: { runs: AppData["runs"] }): ReactNode {
+  const t = useTranslate();
   return (
     <table>
       <thead>
         <tr>
-          <th>Action</th>
-          <th>Status</th>
-          <th>Started</th>
-          <th>Duration</th>
-          <th>Input</th>
+          <th>{t("overview.table.action")}</th>
+          <th>{t("overview.table.status")}</th>
+          <th>{t("overview.table.started")}</th>
+          <th>{t("overview.table.duration")}</th>
+          <th>{t("overview.table.input")}</th>
         </tr>
       </thead>
       <tbody>
         {props.runs.map((run) => (
           <tr key={run.id}>
             <td className="mono">{run.actionId}</td>
-            <td>{run.ok ? <Badge tone="success">Success</Badge> : <Badge tone="error">Failed</Badge>}</td>
+            <td>
+              {run.ok ? (
+                <Badge tone="success">{t("common.success")}</Badge>
+              ) : (
+                <Badge tone="error">{t("common.failed")}</Badge>
+              )}
+            </td>
             <td>{formatDate(run.startedAt)}</td>
             <td>{formatDuration(run)}</td>
             <td className="mono">{compactJson(run.inputSummary)}</td>

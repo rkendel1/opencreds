@@ -3,6 +3,7 @@ import type { ConnectionService } from "../../connection-service.ts";
 import type { ActionPolicyService } from "../../core/action-policy.ts";
 import type { ExecutionContext, ExecutionResult, TransitFileWriter } from "../../core/types.ts";
 import type { IProviderLoader } from "../../providers/provider-loader.ts";
+import type { Logger } from "../logger.ts";
 import type { IRunLogStore, RunLogListInput, RunLogPage, RunLogCaller } from "../storage/runtime-store.ts";
 
 import { executeAction as executeProviderAction } from "../../core/execution.ts";
@@ -15,6 +16,7 @@ export interface ActionRunnerOptions {
   runs: IRunLogStore;
   transitFiles?: TransitFileWriter;
   actionPolicy?: ActionPolicyService;
+  logger?: Logger;
 }
 
 export interface RunActionInput {
@@ -42,9 +44,25 @@ export class ActionRunner {
   async run(input: RunActionInput): Promise<ActionRunResult | undefined> {
     const action = this.options.catalog.actionsById.get(input.actionId);
     if (!action) {
+      this.options.logger?.warn(
+        {
+          actionId: input.actionId,
+          caller: input.caller,
+          connectionName: input.connectionName,
+          errorCode: "invalid_input",
+        },
+        "action run rejected",
+      );
       return undefined;
     }
 
+    const logContext = {
+      actionId: action.id,
+      service: action.service,
+      caller: input.caller,
+      connectionName: input.connectionName,
+    };
+    this.options.logger?.info(logContext, "action run started");
     const connection = await this.options.connections.getConnectionSummary(action.service, input.connectionName);
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
@@ -78,6 +96,19 @@ export class ActionRunner {
       errorCode: result.error?.code,
       errorMessage: result.error?.message,
     });
+
+    const completedLogContext = {
+      ...logContext,
+      executionId,
+      durationMs: completedAtMs - startedAtMs,
+      ok: result.ok,
+      errorCode: result.error?.code,
+    };
+    if (result.ok) {
+      this.options.logger?.info(completedLogContext, "action run completed");
+    } else {
+      this.options.logger?.warn(completedLogContext, "action run failed");
+    }
 
     return { executionId, result };
   }

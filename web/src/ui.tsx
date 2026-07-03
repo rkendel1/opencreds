@@ -1,3 +1,4 @@
+import type { AppLang } from "./i18n";
 import type {
   AppData,
   ConnectionRecord,
@@ -8,12 +9,14 @@ import type {
 } from "./model";
 import type { FormEvent, ReactNode } from "react";
 
+import { useI18n, useLang, useTranslate } from "@embra/i18n/react";
 import { Activity, AppWindow, BookOpen, KeyRound, Loader2, RefreshCw, TerminalSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router";
 import { AccessPage } from "./access-page";
 import { ActionsPage } from "./actions-page";
 import { ApiError, apiGet } from "./api";
+import { persistLang, supportedLangs } from "./i18n";
 import { emptyData } from "./model";
 import { OverviewPage } from "./overview-page";
 import { ProvidersPage } from "./providers-page";
@@ -22,15 +25,16 @@ import { RunsPage } from "./runs-page";
 import { InlineError, StatusDot } from "./shared-ui";
 
 const navItems = [
-  { path: "/overview", label: "Overview", icon: Activity },
-  { path: "/providers", label: "Providers", icon: AppWindow },
-  { path: "/actions", label: "Actions", icon: TerminalSquare },
-  { path: "/runs", label: "Runs", icon: Activity },
-  { path: "/access", label: "Access", icon: KeyRound },
-  { path: "/resources", label: "Docs", icon: BookOpen },
+  { path: "/overview", labelKey: "nav.overview", icon: Activity },
+  { path: "/providers", labelKey: "nav.providers", icon: AppWindow },
+  { path: "/actions", labelKey: "nav.actions", icon: TerminalSquare },
+  { path: "/runs", labelKey: "nav.runs", icon: Activity },
+  { path: "/access", labelKey: "nav.access", icon: KeyRound },
+  { path: "/resources", labelKey: "nav.docs", icon: BookOpen },
 ] as const;
 
 export function App(): ReactNode {
+  const t = useTranslate();
   const [data, setData] = useState<AppData>(emptyData);
   const [adminToken, setAdminToken] = useState("");
   const [locked, setLocked] = useState(false);
@@ -69,10 +73,10 @@ export function App(): ReactNode {
         if (caught instanceof ApiError && caught.status === 401) {
           setData(emptyData);
           setLocked(true);
-          setError(adminToken.trim() ? "Admin token is invalid or missing." : null);
+          setError(adminToken.trim() ? t("shell.invalidAdminToken") : null);
           return;
         }
-        setError(caught instanceof Error ? caught.message : "Failed to load runtime data.");
+        setError(caught instanceof Error ? caught.message : t("shell.loadRuntimeFailed"));
       })
       .finally(() => {
         if (!cancelled) {
@@ -83,7 +87,7 @@ export function App(): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [adminToken, refreshToken]);
+  }, [adminToken, refreshToken, t]);
 
   function refresh(): void {
     setRefreshToken((value) => value + 1);
@@ -125,6 +129,7 @@ function AppShell(props: {
   onRefresh(): void;
   onClearClientToken(): void;
 }): ReactNode {
+  const t = useTranslate();
   const location = useLocation();
   const actions = useMemo(() => props.data.providers.flatMap((provider) => provider.actions), [props.data.providers]);
   const heading = headingForPath(location.pathname);
@@ -138,11 +143,11 @@ function AppShell(props: {
           <div className="brand-mark">OC</div>
           <div>
             <div className="brand-name">OOMOL Connect</div>
-            <div className="brand-subtitle">Local runtime console</div>
+            <div className="brand-subtitle">{t("brand.subtitle")}</div>
           </div>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Primary">
+        <nav className="sidebar-nav" aria-label={t("shell.primaryNav")}>
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -152,24 +157,25 @@ function AppShell(props: {
                 to={item.path}
               >
                 <Icon size={16} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </NavLink>
             );
           })}
         </nav>
 
         <div className="sidebar-footer">
+          <LanguageSelect />
           <div className="runtime-status">
             <StatusDot ok={!props.error} />
-            <span>{props.error ? "API unavailable" : "Runtime ready"}</span>
+            <span>{props.error ? t("common.apiUnavailable") : t("common.runtimeReady")}</span>
           </div>
           <div className="button-row tight">
-            <button className="icon-button compact" onClick={props.onRefresh} aria-label="Refresh data">
+            <button className="icon-button compact" onClick={props.onRefresh} aria-label={t("shell.refreshData")}>
               {props.loading ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
             </button>
             {props.adminToken ? (
               <button className="secondary-button compact" onClick={props.onClearClientToken}>
-                Clear typed token
+                {t("shell.clearTypedToken")}
               </button>
             ) : null}
           </div>
@@ -179,13 +185,13 @@ function AppShell(props: {
       <main className={isBrowserPage ? "main main-browser" : "main"}>
         <section className="page-header">
           <div>
-            <h1>{heading.title}</h1>
-            <p>{heading.subtitle}</p>
+            <h1>{t(`shell.headings.${heading}.title`)}</h1>
+            <p>{t(`shell.headings.${heading}.subtitle`)}</p>
           </div>
           {props.loading ? (
             <div className="loading-panel page-loading">
               <Loader2 className="spin" size={16} />
-              Loading runtime data...
+              {t("common.loadingRuntimeData")}
             </div>
           ) : null}
         </section>
@@ -236,6 +242,7 @@ function AppShell(props: {
 }
 
 function UnlockView(props: { loading: boolean; message: string | null; onUnlock(token: string): void }): ReactNode {
+  const t = useTranslate();
   const [token, setToken] = useState("");
 
   function submit(event: FormEvent): void {
@@ -250,12 +257,13 @@ function UnlockView(props: { loading: boolean; message: string | null; onUnlock(
           <div className="brand-mark">OC</div>
           <div>
             <div className="brand-name">OOMOL Connect</div>
-            <div className="brand-subtitle">Admin access</div>
+            <div className="brand-subtitle">{t("brand.adminAccess")}</div>
           </div>
         </div>
+        <LanguageSelect />
         <form className="form-grid" onSubmit={submit}>
           <label className="field">
-            <span>Admin token</span>
+            <span>{t("unlock.adminToken")}</span>
             <input
               type="password"
               value={token}
@@ -266,7 +274,7 @@ function UnlockView(props: { loading: boolean; message: string | null; onUnlock(
           </label>
           <button className="primary-button" type="submit" disabled={!token.trim() || props.loading}>
             {props.loading ? <Loader2 className="spin" size={16} /> : null}
-            Unlock console
+            {t("unlock.unlockConsole")}
           </button>
         </form>
         {props.message ? <InlineError message={props.message} /> : null}
@@ -275,22 +283,46 @@ function UnlockView(props: { loading: boolean; message: string | null; onUnlock(
   );
 }
 
-function headingForPath(pathname: string): { title: string; subtitle: string } {
+function LanguageSelect(): ReactNode {
+  const t = useTranslate();
+  const i18n = useI18n();
+  const lang = useLang() as AppLang;
+
+  function switchLang(nextLang: AppLang): void {
+    persistLang(nextLang);
+    void i18n.switchLang(nextLang);
+  }
+
+  return (
+    <label className="language-select">
+      <span>{t("language.label")}</span>
+      <select value={lang} onChange={(event) => switchLang(event.target.value as AppLang)}>
+        {supportedLangs.map((item) => (
+          <option key={item} value={item}>
+            {t(`language.${item}`)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function headingForPath(pathname: string): string {
   const section = pathname.split("/").filter(Boolean)[0];
   if (section === "providers") {
-    return { title: "Providers", subtitle: "Connect providers and review provider capabilities." };
+    return "providers";
   }
   if (section === "actions") {
-    return { title: "Actions", subtitle: "Search, inspect, and debug local runtime actions." };
+    return "actions";
   }
   if (section === "runs") {
-    return { title: "Runs", subtitle: "Recent local action executions." };
+    return "runs";
   }
   if (section === "access") {
-    return { title: "Access", subtitle: "Manage runtime API tokens for agents and clients." };
+    return "access";
   }
   if (section === "resources") {
-    return { title: "Resources", subtitle: "Generated API references and tool metadata." };
+    return "resources";
   }
-  return { title: "Overview", subtitle: "Runtime status, health, and common operations." };
+  return "overview";
 }

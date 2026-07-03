@@ -1,6 +1,7 @@
 import type { ActionDefinition, AppData, ExecutionResult, JsonSchema, RuntimeActionResponse } from "./model";
 import type { ReactNode } from "react";
 
+import { useTranslate } from "@embra/i18n/react";
 import { useClipboard } from "foxact/use-clipboard";
 import { Check, ChevronRight, Code2, Copy, ExternalLink, Loader2, Play, Search, TerminalSquare, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +30,7 @@ interface ExampleTabsProps {
 const actionPageSize = 120;
 
 export function ActionsPage(props: ActionsPageProps): ReactNode {
+  const t = useTranslate();
   const params = useParams();
   const [query, setQuery] = useState("");
   const [selectedService, setSelectedService] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
   );
   const selectedProviderName = selectedService
     ? (providerNames.get(selectedService) ?? selectedService)
-    : "All providers";
+    : t("actions.allProviders");
 
   useEffect(() => {
     selectedRowRef.current?.scrollIntoView({ block: "nearest" });
@@ -81,8 +83,8 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
           <small>{action.id}</small>
           <small className="action-row-meta">
             {providerNames.get(action.service) ?? action.service} ·{" "}
-            {action.execution.locallyExecutable ? "Local" : "Catalog"} ·{" "}
-            {action.execution.noAuthRunnable ? "No auth" : "Credential"}
+            {action.execution.locallyExecutable ? t("common.local") : t("common.catalogOnly")} ·{" "}
+            {action.execution.noAuthRunnable ? t("common.noAuth") : t("common.credential")}
           </small>
         </span>
         <ChevronRight size={16} />
@@ -98,13 +100,13 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search actions by name, id, or provider"
+            placeholder={t("actions.searchPlaceholder")}
           />
         </label>
         <label className="select-filter">
-          <span>Provider</span>
+          <span>{t("actions.provider")}</span>
           <select value={selectedService ?? ""} onChange={(event) => setSelectedService(event.target.value || null)}>
-            <option value="">All providers</option>
+            <option value="">{t("actions.allProviders")}</option>
             {props.data.providers.map((provider) => (
               <option key={provider.service} value={provider.service}>
                 {provider.displayName}
@@ -115,39 +117,37 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
       </section>
 
       <div className="split-view actions-layout">
-        <section className="list-panel actions-list" aria-label="Actions">
+        <section className="list-panel actions-list" aria-label={t("nav.actions")}>
           <div className="list-panel-header">
             <div>
-              <strong>{visibleActions.length} actions</strong>
+              <strong>{t("actions.actionsCount", { count: visibleActions.length })}</strong>
               <span>{selectedProviderName}</span>
             </div>
             {query || selectedService ? (
               <button className="secondary-button compact" onClick={clearFilters}>
-                Clear
+                {t("common.clear")}
               </button>
             ) : null}
           </div>
           {visibleActions.length === 0 ? (
-            <EmptyState title="No actions found" description="Try a different search or provider filter." />
+            <EmptyState title={t("actions.noActionsTitle")} description={t("actions.noActionsDescription")} />
           ) : (
             <>
               {pinnedSelectedAction ? (
                 <div className="pinned-action">
-                  <span>Current selection</span>
+                  <span>{t("common.currentSelection")}</span>
                   {renderActionRow(pinnedSelectedAction)}
                 </div>
               ) : null}
               {renderedActions.map((action) => renderActionRow(action))}
               {hasMoreActions ? (
                 <div className="list-panel-footer">
-                  <span>
-                    Showing {renderedActions.length} of {visibleActions.length}
-                  </span>
+                  <span>{t("common.showing", { shown: renderedActions.length, total: visibleActions.length })}</span>
                   <button
                     className="secondary-button compact"
                     onClick={() => setVisibleLimit((value) => value + actionPageSize)}
                   >
-                    Show more
+                    {t("common.showMore")}
                   </button>
                 </div>
               ) : null}
@@ -166,11 +166,9 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
           ) : (
             <EmptyState
               icon={<TerminalSquare size={20} />}
-              title={params.actionId ? "Action not found" : "No action selected"}
+              title={params.actionId ? t("actions.actionNotFoundTitle") : t("actions.noActionSelectedTitle")}
               description={
-                params.actionId
-                  ? "The action route does not match the current catalog."
-                  : "Select an action to inspect and run it."
+                params.actionId ? t("actions.actionNotFoundDescription") : t("actions.selectActionDescription")
               }
             />
           )}
@@ -181,6 +179,7 @@ export function ActionsPage(props: ActionsPageProps): ReactNode {
 }
 
 function ActionDetail(props: ActionDetailProps): ReactNode {
+  const t = useTranslate();
   const [debugOpen, setDebugOpen] = useState(false);
   const examples = useMemo(() => buildActionExamples(props.action), [props.action]);
 
@@ -198,9 +197,9 @@ function ActionDetail(props: ActionDetailProps): ReactNode {
         </div>
         <div className="button-row action-status-row">
           <Badge tone={props.action.execution.locallyExecutable ? "success" : undefined}>
-            {props.action.execution.locallyExecutable ? "Locally executable" : "Catalog only"}
+            {props.action.execution.locallyExecutable ? t("actions.locallyExecutable") : t("common.catalogOnly")}
           </Badge>
-          <Badge>{props.action.execution.noAuthRunnable ? "No auth" : "Needs credential"}</Badge>
+          <Badge>{props.action.execution.noAuthRunnable ? t("common.noAuth") : t("actions.needsCredential")}</Badge>
           <Badge>{props.providerName}</Badge>
         </div>
       </div>
@@ -212,7 +211,7 @@ function ActionDetail(props: ActionDetailProps): ReactNode {
           onClick={() => setDebugOpen(true)}
         >
           <Play size={16} />
-          Debug Action
+          {t("actions.debugAction")}
         </button>
         <a
           className="secondary-link"
@@ -224,12 +223,12 @@ function ActionDetail(props: ActionDetailProps): ReactNode {
           Agent.md
         </a>
         <Link className="secondary-link" to={`/providers/${props.action.service}`}>
-          Provider
+          {t("actions.provider")}
         </Link>
       </div>
       <div className="panel-section">
-        <h3>Required Scopes</h3>
-        <TagList values={props.action.requiredScopes} empty="No scopes" />
+        <h3>{t("actions.requiredScopes")}</h3>
+        <TagList values={props.action.requiredScopes} empty={t("providers.noScopes")} />
       </div>
       <ParameterList schema={props.action.inputSchema} />
       <ExampleTabs action={props.action} examples={examples} />
@@ -246,16 +245,17 @@ function ActionDetail(props: ActionDetailProps): ReactNode {
 }
 
 function ParameterList(props: { schema: JsonSchema }): ReactNode {
+  const t = useTranslate();
   const parameters = parameterSummaries(props.schema);
 
   return (
     <details className="parameter-card">
       <summary>
-        <span>Parameters</span>
-        <Badge>{parameters.length} fields</Badge>
+        <span>{t("actions.parameters")}</span>
+        <Badge>{t("actions.fieldsCount", { count: parameters.length })}</Badge>
       </summary>
       {parameters.length === 0 ? (
-        <p className="muted-copy">No input parameters.</p>
+        <p className="muted-copy">{t("actions.noInputParameters")}</p>
       ) : (
         <div className="parameter-list">
           {parameters.map((parameter) => (
@@ -265,7 +265,7 @@ function ParameterList(props: { schema: JsonSchema }): ReactNode {
                 {parameter.description ? <p>{parameter.description}</p> : null}
               </div>
               <span className="parameter-meta">
-                {parameter.required ? "Required" : "Optional"} · {parameter.type}
+                {parameter.required ? t("actions.required") : t("actions.optional")} · {parameter.type}
               </span>
             </div>
           ))}
@@ -276,6 +276,7 @@ function ParameterList(props: { schema: JsonSchema }): ReactNode {
 }
 
 function ExampleTabs(props: ExampleTabsProps): ReactNode {
+  const t = useTranslate();
   const [active, setActive] = useState<"curl" | "typescript" | "agent">("curl");
   const { copy, copied } = useClipboard();
   const agent = buildAgentPrompt(props.action);
@@ -289,7 +290,7 @@ function ExampleTabs(props: ExampleTabsProps): ReactNode {
   return (
     <section className="example-card">
       <div className="tab-row">
-        <div className="segmented-control" role="tablist" aria-label="Action examples">
+        <div className="segmented-control" role="tablist" aria-label={t("actions.actionExamples")}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -311,13 +312,17 @@ function ExampleTabs(props: ExampleTabsProps): ReactNode {
               rel="noreferrer"
             >
               <ExternalLink size={15} />
-              Open
+              {t("actions.open")}
             </a>
           ) : null}
           <button
             className="icon-button subtle"
             onClick={() => void copy(selected.code)}
-            aria-label={copied ? `Copied ${selected.label}` : `Copy ${selected.label}`}
+            aria-label={
+              copied
+                ? t("actions.copiedExample", { label: selected.label })
+                : t("actions.copyExample", { label: selected.label })
+            }
           >
             {copied ? <Check size={15} /> : <Copy size={15} />}
           </button>
@@ -334,6 +339,7 @@ function RunActionModal(props: {
   onRefresh(): void;
   onClose(): void;
 }): ReactNode {
+  const t = useTranslate();
   const [input, setInput] = useState(() => exampleInput(props.action.inputSchema));
   const [result, setResult] = useState<ExecutionResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -368,7 +374,7 @@ function RunActionModal(props: {
               ok: false,
               error: {
                 code: payload.errorCode ?? `http_${response.status}`,
-                message: payload.message ?? "Action failed.",
+                message: payload.message ?? t("actions.actionFailed"),
                 details: payload.data,
               },
             },
@@ -379,7 +385,7 @@ function RunActionModal(props: {
         ok: false,
         error: {
           code: "client_error",
-          message: error instanceof Error ? error.message : "Action failed.",
+          message: error instanceof Error ? error.message : t("actions.actionFailed"),
         },
       });
     } finally {
@@ -392,16 +398,16 @@ function RunActionModal(props: {
       <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="run-action-title">
         <div className="modal-header">
           <div>
-            <h3 id="run-action-title">Debug Action</h3>
+            <h3 id="run-action-title">{t("actions.debugAction")}</h3>
             <p>{props.action.id}</p>
           </div>
-          <button className="icon-button subtle" onClick={props.onClose} aria-label="Close debug action">
+          <button className="icon-button subtle" onClick={props.onClose} aria-label={t("actions.closeDebugAction")}>
             <X size={16} />
           </button>
         </div>
         <div className={result ? "modal-body has-result" : "modal-body"}>
           <label className="field">
-            <span>Input</span>
+            <span>{t("actions.input")}</span>
             <textarea
               className="json-input"
               value={input}
@@ -412,13 +418,13 @@ function RunActionModal(props: {
           <div className="button-row">
             <button className="primary-button" onClick={() => void run()} disabled={running}>
               {running ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
-              {running ? "Running" : "Run"}
+              {running ? t("actions.running") : t("actions.run")}
             </button>
           </div>
           {running ? (
             <div className="loading-panel">
               <Loader2 className="spin" size={16} />
-              Running action...
+              {t("actions.runningAction")}
             </div>
           ) : null}
           {result ? <ResultPanel actionId={props.action.id} result={result} /> : null}
@@ -429,10 +435,13 @@ function RunActionModal(props: {
 }
 
 function ResultPanel(props: { actionId: string; result: ExecutionResult }): ReactNode {
+  const t = useTranslate();
   return (
     <div className={props.result.ok ? "result-panel ok" : "result-panel error"}>
       <div className="result-header">
-        <Badge tone={props.result.ok ? "success" : "error"}>{props.result.ok ? "Success" : "Failed"}</Badge>
+        <Badge tone={props.result.ok ? "success" : "error"}>
+          {props.result.ok ? t("common.success") : t("common.failed")}
+        </Badge>
         <span>{props.actionId}</span>
       </div>
       <pre className="result-box">{JSON.stringify(props.result, null, 2)}</pre>

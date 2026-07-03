@@ -452,55 +452,117 @@ export class ConnectServer {
     const body = await readJsonBody(context);
     const authType = optionalString(body.authType);
     if (!authType) {
+      this.options.logger?.warn(
+        {
+          errorCode: "invalid_input",
+          path: context.req.path,
+          service,
+        },
+        "connection rejected",
+      );
       return jsonError(context, 400, "invalid_input", "authType is required.");
     }
 
     const values = body.values ?? body;
     const connectionName = readConnectionName(context, body);
+    const logContext: ConnectionLogContext = {
+      operation: "connect",
+      path: context.req.path,
+      service,
+      authType,
+      connectionName,
+    };
     if (authType === "no_auth") {
+      this.options.logger?.info(logContext, "connection started");
       return this.writeConnectionResult(
         context,
         this.options.connections.connectWithoutAuth(service, { connectionName }),
+        logContext,
       );
     }
     if (authType === "api_key") {
+      this.options.logger?.info(logContext, "connection started");
       return this.writeConnectionResult(
         context,
         this.options.connections.connectWithApiKey(service, { values, connectionName }),
+        logContext,
       );
     }
     if (authType === "custom_credential") {
+      this.options.logger?.info(logContext, "connection started");
       return this.writeConnectionResult(
         context,
         this.options.connections.connectWithCustomCredential(service, { values, connectionName }),
+        logContext,
       );
     }
 
+    this.options.logger?.warn(
+      {
+        ...logContext,
+        errorCode: "unsupported_auth_type",
+      },
+      "connection rejected",
+    );
     return jsonError(context, 400, "unsupported_auth_type", `${service} does not support ${authType}.`);
   }
 
   private async disconnect(context: Context, service: string): Promise<Response> {
     const body = context.req.header("content-type")?.includes("application/json") ? await readJsonBody(context) : {};
+    const connectionName = readConnectionName(context, body);
+    const logContext: ConnectionLogContext = {
+      operation: "disconnect",
+      path: context.req.path,
+      service,
+      connectionName,
+    };
+    this.options.logger?.info(logContext, "connection disconnect started");
     return this.writeConnectionResult(
       context,
-      this.options.connections.disconnect(service, readConnectionName(context, body)),
+      this.options.connections.disconnect(service, connectionName),
+      logContext,
     );
   }
 
   private async createOAuthAuthorization(context: Context): Promise<Response> {
     const body = await readJsonBody(context);
+    const requestedService = optionalString(body.service);
+    const connectionName = readConnectionName(context, body);
     try {
       const service = requiredString(
         body.service,
         "service",
         (message) => new OAuthFlowError("invalid_input", message),
       );
-      return await this.writeOAuthResult(
-        context,
-        this.options.oauthFlow.startAuthorization({ service, connectionName: readConnectionName(context, body) }),
+      const logContext = {
+        path: context.req.path,
+        service,
+        connectionName,
+      };
+      this.options.logger?.info(logContext, "oauth authorization started");
+
+      const authorization = await this.options.oauthFlow.startAuthorization({ service, connectionName });
+      const authorizationUrl = new URL(authorization.authorizationUrl);
+      this.options.logger?.info(
+        {
+          ...logContext,
+          authorizationHost: authorizationUrl.host,
+          redirectUri: authorizationUrl.searchParams.get("redirect_uri") ?? undefined,
+        },
+        "oauth authorization created",
       );
+      return context.json(authorization);
     } catch (error) {
       if (error instanceof OAuthFlowError) {
+        this.options.logger?.warn(
+          {
+            errorCode: error.code,
+            path: context.req.path,
+            service: requestedService,
+            connectionName,
+          },
+          "oauth authorization failed",
+        );
         return jsonError(context, error.code === "unknown_service" ? 404 : 400, error.code, error.message);
       }
 
@@ -563,15 +625,42 @@ export class ConnectServer {
   private async completeOAuth(context: Context): Promise<Response> {
     const state = context.req.query("state");
     const code = context.req.query("code");
+    const logContext = {
+      path: context.req.path,
+      hasState: Boolean(state),
+      hasCode: Boolean(code),
+    };
+    this.options.logger?.info(logContext, "oauth callback received");
     if (!state || !code) {
+      this.options.logger?.warn(
+        {
+          ...logContext,
+          errorCode: "invalid_oauth_callback",
+        },
+        "oauth callback failed",
+      );
       return jsonError(context, 400, "invalid_oauth_callback", "OAuth callback requires state and code.");
     }
 
     let service: string;
     try {
       service = (await this.options.oauthFlow.completeAuthorization({ state, code })).service;
+      this.options.logger?.info(
+        {
+          ...logContext,
+          service,
+        },
+        "oauth callback completed",
+      );
     } catch (error) {
       if (error instanceof OAuthFlowError) {
+        this.options.logger?.warn(
+          {
+            ...logContext,
+            errorCode: error.code,
+          },
+          "oauth callback failed",
+        );
         return jsonError(context, 400, error.code, error.message);
       }
       throw error;
@@ -582,11 +671,31 @@ export class ConnectServer {
     );
   }
 
-  private async writeConnectionResult(context: Context, operation: Promise<unknown>): Promise<Response> {
+  private async writeConnectionResult(
+    context: Context,
+    operation: Promise<unknown>,
+    logContext?: ConnectionLogContext,
+  ): Promise<Response> {
     try {
-      return context.json(await operation);
+      const result = await operation;
+      if (logContext) {
+        this.options.logger?.info(
+          logContext,
+          logContext.operation === "disconnect" ? "connection disconnect completed" : "connection completed",
+        );
+      }
+      return context.json(result);
     } catch (error) {
       if (error instanceof ConnectionError) {
+        if (logContext) {
+          this.options.logger?.warn(
+            {
+              ...logContext,
+              errorCode: error.code,
+            },
+            logContext.operation === "disconnect" ? "connection disconnect failed" : "connection failed",
+          );
+        }
         return jsonError(context, error.code === "unknown_service" ? 404 : 400, error.code, error.message);
       }
 
@@ -608,6 +717,14 @@ export class ConnectServer {
       throw error;
     }
   }
+}
+
+interface ConnectionLogContext {
+  operation: "connect" | "disconnect";
+  path: string;
+  service: string;
+  authType?: string;
+  connectionName?: string;
 }
 
 function readConnectionName(context: Context, body?: Record<string, unknown>): string | undefined {

@@ -5,13 +5,14 @@ import type { ActionDefinition, ActionExecutor, ProviderDefinition, ResolvedCred
 import type { IOAuthClientConfigStore, OAuthClientConfig } from "../oauth/oauth-client-config-service.ts";
 import type { IOAuthStateStore, OAuthAuthorizationState } from "../oauth/oauth-flow-service.ts";
 import type { IProviderLoader } from "../providers/provider-loader.ts";
+import type { Logger } from "./logger.ts";
 import type { IRunLogStore, RunLog, RunLogListInput, RunLogPage } from "./storage/runtime-store.ts";
 import type { IRuntimeTokenStore, RuntimeTokenRecord } from "./storage/runtime-token-service.ts";
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createCatalogStore } from "../catalog-store.ts";
 import { ConnectionService } from "../connection-service.ts";
 import { ActionPolicyService as LocalActionPolicyService } from "../core/action-policy.ts";
@@ -282,6 +283,230 @@ describe("ConnectServer", () => {
     expect(JSON.stringify(body)).not.toContain("app-token");
   });
 
+  it("logs connection and OAuth steps without credential values", async () => {
+    const { entries, logger } = createTestLogger();
+    const app = createTestServer([apiKeyProvider, oauthProvider], { logger }).createApp();
+
+    const connection = await app.request("/api/connections/example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        authType: "api_key",
+        connectionName: "work",
+        values: {
+          apiKey: "example-key",
+        },
+      }),
+    });
+    expect(connection.status).toBe(200);
+
+    const config = await app.request("/api/oauth/configs/oauth_example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        clientId: "oauth-client-id",
+        clientSecret: "oauth-client-secret",
+        secretExtra: {
+          appBearerToken: "app-token",
+        },
+      }),
+    });
+    expect(config.status).toBe(200);
+
+    const authorization = await app.request("/api/oauth/authorizations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        service: "oauth_example",
+        connectionName: "work",
+      }),
+    });
+    expect(authorization.status).toBe(200);
+
+    const callback = await app.request("/oauth/callback?state=missing-state&code=secret-code");
+    expect(callback.status).toBe(400);
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            service: "example",
+            authType: "api_key",
+            connectionName: "work",
+          }),
+          message: "connection started",
+        },
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            service: "example",
+            authType: "api_key",
+            connectionName: "work",
+          }),
+          message: "connection completed",
+        },
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            service: "oauth_example",
+            connectionName: "work",
+          }),
+          message: "oauth authorization started",
+        },
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            service: "oauth_example",
+            connectionName: "work",
+            authorizationHost: "example.com",
+            redirectUri: "http://localhost:3000/oauth/callback",
+          }),
+          message: "oauth authorization created",
+        },
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            hasState: true,
+            hasCode: true,
+          }),
+          message: "oauth callback received",
+        },
+        {
+          level: "warn",
+          fields: expect.objectContaining({
+            errorCode: "invalid_oauth_state",
+            hasState: true,
+            hasCode: true,
+          }),
+          message: "oauth callback failed",
+        },
+      ]),
+    );
+    const logOutput = JSON.stringify(entries);
+    expect(logOutput).not.toContain("example-key");
+    expect(logOutput).not.toContain("oauth-client-secret");
+    expect(logOutput).not.toContain("app-token");
+    expect(logOutput).not.toContain("missing-state");
+    expect(logOutput).not.toContain("secret-code");
+  });
+
+  it("logs action runs without input and output values", async () => {
+    const { entries, logger } = createTestLogger();
+    const app = createTestServer(
+      [
+        {
+          ...apiKeyProvider,
+          actions: [echoAction],
+        },
+      ],
+      {
+        logger,
+        providerLoader: new EchoProviderLoader(),
+      },
+    ).createApp();
+
+    const connection = await app.request("/api/connections/example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ authType: "api_key", values: { apiKey: "example-key" } }),
+    });
+    expect(connection.status).toBe(200);
+
+    const run = await app.request("/v1/actions/example.echo", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        input: {
+          message: "secret-message",
+          nested: {
+            token: "secret-token",
+          },
+        },
+      }),
+    });
+    expect(run.status).toBe(200);
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            actionId: "example.echo",
+            service: "example",
+            caller: "http",
+          }),
+          message: "action run started",
+        },
+        {
+          level: "info",
+          fields: expect.objectContaining({
+            actionId: "example.echo",
+            service: "example",
+            caller: "http",
+            ok: true,
+            executionId: expect.any(String),
+            durationMs: expect.any(Number),
+          }),
+          message: "action run completed",
+        },
+      ]),
+    );
+    const logOutput = JSON.stringify(entries);
+    expect(logOutput).not.toContain("example-key");
+    expect(logOutput).not.toContain("secret-message");
+    expect(logOutput).not.toContain("secret-token");
+  });
+
+  it("logs failed action runs with error codes", async () => {
+    const { entries, logger } = createTestLogger();
+    const app = createTestServer(
+      [
+        {
+          ...apiKeyProvider,
+          actions: [echoAction],
+        },
+      ],
+      {
+        actionPolicy: new LocalActionPolicyService({
+          blockedActions: ["example.echo"],
+        }),
+        logger,
+        providerLoader: new EchoProviderLoader(),
+      },
+    ).createApp();
+
+    const run = await app.request("/v1/actions/example.echo", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        input: {
+          message: "secret-message",
+        },
+      }),
+    });
+    expect(run.status).toBe(400);
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        {
+          level: "warn",
+          fields: expect.objectContaining({
+            actionId: "example.echo",
+            service: "example",
+            caller: "http",
+            ok: false,
+            errorCode: "action_blocked",
+            executionId: expect.any(String),
+            durationMs: expect.any(Number),
+          }),
+          message: "action run failed",
+        },
+      ]),
+    );
+    expect(JSON.stringify(entries)).not.toContain("secret-message");
+  });
+
   it("does not copy secret credential fields into fallback connection profiles", async () => {
     const app = createTestServer([
       {
@@ -374,6 +599,47 @@ describe("ConnectServer", () => {
         message: "OAuth state is missing or expired.",
       },
     });
+  });
+
+  it("lists OAuth connections after the callback completes", async () => {
+    const app = createTestServer([oauthProvider]).createApp();
+    const config = await app.request("/api/oauth/configs/oauth_example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        clientId: "client-id",
+        clientSecret: "client-secret",
+        secretExtra: {
+          appBearerToken: "app-token",
+        },
+      }),
+    });
+    expect(config.status).toBe(200);
+    const authorization = await app.request("/api/oauth/authorizations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ service: "oauth_example" }),
+    });
+    expect(authorization.status).toBe(200);
+    const { state } = (await authorization.json()) as { state: string };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ access_token: "access-token", token_type: "Bearer" })),
+    );
+
+    const callback = await app.request(`/oauth/callback?state=${state}&code=example-code`);
+    const callbackText = await callback.text();
+
+    expect(callback.status, callbackText).toBe(200);
+    const connections = await app.request("/api/connections");
+    expect(connections.status).toBe(200);
+    await expect(connections.json()).resolves.toMatchObject([
+      {
+        service: "oauth_example",
+        authType: "oauth2",
+        configured: true,
+      },
+    ]);
   });
 
   it("keeps the console shell public while protecting admin APIs", async () => {
@@ -1145,6 +1411,7 @@ interface CreateTestServerOptions {
   actionPolicy?: ActionPolicyService;
   actionSearch?: ActionSearchIndexProvider;
   providerLoader?: IProviderLoader;
+  logger?: Logger;
   runtimeTokens?: RuntimeTokenService;
   runs?: MemoryRunLogStore;
   staticRoot?: string | false;
@@ -1184,6 +1451,7 @@ function createTestServer(providers: ProviderDefinition[], options: CreateTestSe
     runs,
     transitFiles,
     actionPolicy: options.actionPolicy,
+    logger: options.logger,
   });
   const staticRoot = options.staticRoot === false ? undefined : (options.staticRoot ?? ".tmp/test-static");
 
@@ -1208,7 +1476,32 @@ function createTestServer(providers: ProviderDefinition[], options: CreateTestSe
     },
     actionPolicy: options.actionPolicy,
     actionSearch: options.actionSearch,
+    logger: options.logger,
   });
+}
+
+type TestLogEntry = {
+  level: "error" | "info" | "warn";
+  fields: Record<string, unknown>;
+  message: string;
+};
+
+function createTestLogger(): { entries: TestLogEntry[]; logger: Logger } {
+  const entries: TestLogEntry[] = [];
+  const record =
+    (level: TestLogEntry["level"]) =>
+    (fields: Record<string, unknown>, message: string): void => {
+      entries.push({ level, fields, message });
+    };
+
+  return {
+    entries,
+    logger: {
+      error: vi.fn(record("error")),
+      info: vi.fn(record("info")),
+      warn: vi.fn(record("warn")),
+    } as unknown as Logger,
+  };
 }
 
 async function createTempDir(): Promise<string> {
@@ -1335,10 +1628,16 @@ class MemoryOAuthClientConfigStore implements IOAuthClientConfigStore {
 }
 
 class MemoryOAuthStateStore implements IOAuthStateStore {
-  async set(_state: OAuthAuthorizationState): Promise<void> {}
+  private readonly states = new Map<string, OAuthAuthorizationState>();
 
-  async take(_state: string): Promise<OAuthAuthorizationState | undefined> {
-    return undefined;
+  async set(state: OAuthAuthorizationState): Promise<void> {
+    this.states.set(state.state, state);
+  }
+
+  async take(state: string): Promise<OAuthAuthorizationState | undefined> {
+    const value = this.states.get(state);
+    this.states.delete(state);
+    return value;
   }
 }
 

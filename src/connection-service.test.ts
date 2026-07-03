@@ -314,6 +314,35 @@ describe("ConnectionService", () => {
     ]);
   });
 
+  it("stores OAuth credentials when profile validation fails", async () => {
+    const service = createService([oauthProvider], {
+      providerLoader: new FakeProviderLoader({
+        async oauth2() {
+          throw new Error("gmail request failed with 403");
+        },
+      }),
+    });
+
+    await expect(
+      service.setOAuthCredential("example", {
+        authType: "oauth2",
+        accessToken: "access-token",
+        tokenType: "Bearer",
+        profile: testProfile,
+        metadata: {},
+      }),
+    ).resolves.toMatchObject({
+      service: "example",
+      authType: "oauth2",
+      configured: true,
+      profile: testProfile,
+    });
+    await expect(service.getCredential("example")).resolves.toMatchObject({
+      authType: "oauth2",
+      accessToken: "access-token",
+    });
+  });
+
   it("refreshes expired OAuth credentials before returning them", async () => {
     const store = new MemoryConnectionStore();
     const oauthClientConfigs = createOAuthClientConfigs([oauthProvider]);

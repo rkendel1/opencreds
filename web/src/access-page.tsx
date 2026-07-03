@@ -1,8 +1,9 @@
 import type { RuntimeTokenCreation, RuntimeTokenSummary } from "./model";
 import type { FormEvent, ReactNode } from "react";
 
+import { useTranslate } from "@embra/i18n/react";
 import { useClipboard } from "foxact/use-clipboard";
-import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
+import { Check, Copy, KeyRound, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { apiDelete, apiPost } from "./api";
 import { formatDate } from "./model";
@@ -14,15 +15,21 @@ interface AccessPageProps {
   onRefresh(): void;
 }
 
+export function createTokenDialogMode(created: RuntimeTokenCreation | null): "form" | "created" {
+  return created ? "created" : "form";
+}
+
 export function AccessPage(props: AccessPageProps): ReactNode {
+  const t = useTranslate();
   const [name, setName] = useState("");
   const [created, setCreated] = useState<RuntimeTokenCreation | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const { copy, copied } = useClipboard();
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    setStatus("Creating token...");
+    setStatus(t("access.creating"));
     setCreated(null);
     try {
       const result = await apiPost<RuntimeTokenCreation>(
@@ -32,22 +39,36 @@ export function AccessPage(props: AccessPageProps): ReactNode {
       );
       setCreated(result);
       setName("");
-      setStatus("Token created.");
+      setStatus(t("access.created"));
       props.onRefresh();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to create token.");
+      setStatus(error instanceof Error ? error.message : t("access.createFailed"));
     }
   }
 
   async function revoke(id: string): Promise<void> {
-    setStatus("Revoking token...");
+    setStatus(t("access.revoking"));
     try {
       await apiDelete(`/api/runtime-tokens/${id}`, { adminToken: props.adminToken });
-      setStatus("Token revoked.");
+      setStatus(t("access.revoked"));
       props.onRefresh();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to revoke token.");
+      setStatus(error instanceof Error ? error.message : t("access.revokeFailed"));
     }
+  }
+
+  function openCreate(): void {
+    setName("");
+    setCreated(null);
+    setStatus(null);
+    setCreateOpen(true);
+  }
+
+  function closeCreate(): void {
+    setCreateOpen(false);
+    setName("");
+    setCreated(null);
+    setStatus(null);
   }
 
   return (
@@ -58,56 +79,34 @@ export function AccessPage(props: AccessPageProps): ReactNode {
             <KeyRound size={20} />
           </div>
           <div>
-            <h2>Runtime Tokens</h2>
-            <p>Issue bearer tokens for /v1 and MCP clients. New tokens are shown once.</p>
+            <h2>{t("access.title")}</h2>
+            <p>{t("access.description")}</p>
           </div>
         </div>
 
-        <form className="token-create-form" onSubmit={(event) => void submit(event)}>
-          <label className="field">
-            <span>Name</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Local MCP client" />
-          </label>
-          <button className="primary-button" type="submit" disabled={!name.trim()}>
-            <KeyRound size={16} />
-            Create Token
-          </button>
-        </form>
+        <button className="primary-button" type="button" onClick={openCreate}>
+          <KeyRound size={16} />
+          {t("access.createToken")}
+        </button>
       </div>
 
-      {status ? <p className="form-status">{status}</p> : null}
-
-      {created ? (
-        <section className="example-card token-result">
-          <div className="tab-row">
-            <strong>New token</strong>
-            <button
-              className="icon-button subtle"
-              onClick={() => void copy(created.token)}
-              aria-label={copied ? "Copied runtime token" : "Copy runtime token"}
-            >
-              {copied ? <Check size={15} /> : <Copy size={15} />}
-            </button>
-          </div>
-          <pre>{created.token}</pre>
-        </section>
-      ) : null}
+      {!createOpen && status ? <p className="form-status">{status}</p> : null}
 
       <section className="table-panel">
         {props.tokens.length === 0 ? (
           <EmptyState
             icon={<KeyRound size={20} />}
-            title="No runtime tokens yet"
-            description="Create one before connecting an MCP client or local script. The token is shown once."
+            title={t("access.noTokensTitle")}
+            description={t("access.noTokensDescription")}
           />
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Last used</th>
+                <th>{t("access.table.name")}</th>
+                <th>{t("access.table.status")}</th>
+                <th>{t("access.table.created")}</th>
+                <th>{t("access.table.lastUsed")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -117,14 +116,20 @@ export function AccessPage(props: AccessPageProps): ReactNode {
                   <td>
                     <strong>{token.name}</strong>
                   </td>
-                  <td>{token.revokedAt ? <Badge>Revoked</Badge> : <Badge tone="success">Active</Badge>}</td>
+                  <td>
+                    {token.revokedAt ? (
+                      <Badge>{t("common.revoked")}</Badge>
+                    ) : (
+                      <Badge tone="success">{t("common.active")}</Badge>
+                    )}
+                  </td>
                   <td>{formatDate(token.createdAt)}</td>
                   <td>{token.lastUsedAt ? formatDate(token.lastUsedAt) : ""}</td>
                   <td className="table-actions">
                     {!token.revokedAt ? (
                       <button className="secondary-button compact" onClick={() => void revoke(token.id)}>
                         <Trash2 size={15} />
-                        Revoke
+                        {t("access.revoke")}
                       </button>
                     ) : null}
                   </td>
@@ -134,6 +139,102 @@ export function AccessPage(props: AccessPageProps): ReactNode {
           </table>
         )}
       </section>
+
+      {createOpen ? (
+        <CreateTokenDialog
+          name={name}
+          created={created}
+          status={status}
+          copied={copied}
+          onNameChange={setName}
+          onSubmit={submit}
+          onCopy={(token) => void copy(token)}
+          onClose={closeCreate}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function CreateTokenDialog(props: {
+  name: string;
+  created: RuntimeTokenCreation | null;
+  status: string | null;
+  copied: boolean;
+  onNameChange(name: string): void;
+  onSubmit(event: FormEvent): Promise<void>;
+  onCopy(token: string): void;
+  onClose(): void;
+}): ReactNode {
+  const t = useTranslate();
+  const mode = createTokenDialogMode(props.created);
+  const created = mode === "created" ? props.created : null;
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="modal-panel token-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-token-title"
+      >
+        <div className="modal-header">
+          <div>
+            <h3 id="create-token-title">{mode === "created" ? t("access.newToken") : t("access.createToken")}</h3>
+            <p>{mode === "created" ? t("access.tokenShownOnce") : t("access.createTokenDescription")}</p>
+          </div>
+          <button className="icon-button subtle" onClick={props.onClose} aria-label={t("access.closeCreateToken")}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          {created ? (
+            <>
+              <section className="example-card token-result">
+                <div className="tab-row">
+                  <strong>{t("access.newToken")}</strong>
+                  <button
+                    className="secondary-button compact"
+                    onClick={() => props.onCopy(created.token)}
+                    aria-label={props.copied ? t("access.copiedRuntimeToken") : t("access.copyRuntimeToken")}
+                  >
+                    {props.copied ? <Check size={15} /> : <Copy size={15} />}
+                    {props.copied ? t("access.copiedToken") : t("access.copyToken")}
+                  </button>
+                </div>
+                <pre>{created.token}</pre>
+              </section>
+              <p className="form-status">{t("access.tokenShownOnce")}</p>
+              <div className="button-row">
+                <button className="secondary-button" type="button" onClick={props.onClose}>
+                  {t("common.close")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <form className="token-dialog-form" onSubmit={(event) => void props.onSubmit(event)}>
+              <label className="field">
+                <span>{t("access.name")}</span>
+                <input
+                  value={props.name}
+                  onChange={(event) => props.onNameChange(event.target.value)}
+                  placeholder={t("access.namePlaceholder")}
+                />
+              </label>
+              <div className="button-row">
+                <button className="primary-button" type="submit" disabled={!props.name.trim()}>
+                  <KeyRound size={16} />
+                  {t("access.createToken")}
+                </button>
+                <button className="secondary-button" type="button" onClick={props.onClose}>
+                  {t("common.close")}
+                </button>
+              </div>
+              {props.status ? <p className="form-status">{props.status}</p> : null}
+            </form>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }

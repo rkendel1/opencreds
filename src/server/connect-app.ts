@@ -56,6 +56,7 @@ export async function createConnectApp(options: ConnectAppOptions): Promise<Conn
     runs: options.runtimeDatabase.runLogStore,
     transitFiles: options.transitFiles,
     actionPolicy: options.actionPolicy,
+    logger: options.logger,
   });
 
   return {

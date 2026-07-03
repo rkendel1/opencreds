@@ -61,8 +61,10 @@ export interface ConnectionRecord {
 
 export interface OAuthConfig {
   service: string;
-  clientId: string;
-  extra: Record<string, string>;
+  configured: boolean;
+  clientId: string | null;
+  expectedRedirectUri?: string;
+  auth?: Extract<AuthDefinition, { type: "oauth2" }>;
 }
 
 export interface RuntimeTokenSummary {

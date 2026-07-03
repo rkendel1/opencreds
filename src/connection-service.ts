@@ -283,14 +283,17 @@ export class ConnectionService {
     }
 
     const connectionName = normalizeConnectionName(connectionNameInput);
+    let validation: CredentialValidationResult = {};
+    try {
+      validation = await this.validateOAuthCredential(service, credential);
+    } catch (error) {
+      if (!(error instanceof ConnectionError && error.code === "credential_verification_failed")) {
+        throw error;
+      }
+    }
     const storedCredential = {
       ...credential,
-      ...this.mergeCredentialRuntimeData(
-        provider,
-        "oauth2",
-        credential,
-        await this.validateOAuthCredential(service, credential),
-      ),
+      ...this.mergeCredentialRuntimeData(provider, "oauth2", credential, validation),
     };
     await this.store.set(service, connectionName, storedCredential);
     return this.createStoredConnectionSummary(provider, connectionName, storedCredential);

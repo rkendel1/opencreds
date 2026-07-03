@@ -231,6 +231,28 @@ h3 {
   border-top: 1px solid var(--border);
 }
 
+.language-select {
+  display: grid;
+  gap: 6px;
+}
+
+.language-select span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.language-select select {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
 .runtime-status {
   display: flex;
   align-items: center;
@@ -815,6 +837,70 @@ h3 {
   gap: 12px;
 }
 
+.oauth-client-settings {
+  display: grid;
+  gap: 12px;
+}
+
+.oauth-client-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.oauth-client-summary-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.oauth-client-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oauth-client-title svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.oauth-client-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.oauth-client-description,
+.oauth-client-id {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.oauth-client-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SF Mono", ui-monospace, "Cascadia Code", "Roboto Mono", monospace;
+}
+
+.oauth-client-summary .secondary-button {
+  white-space: nowrap;
+}
+
+.oauth-client-editor {
+  padding-top: 2px;
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -1241,7 +1327,7 @@ pre,
 
 .access-panel-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
   align-items: start;
 }
@@ -1250,11 +1336,17 @@ pre,
   margin-bottom: 0;
 }
 
-.token-create-form {
+.access-panel-header > .primary-button {
+  justify-self: end;
+}
+
+.token-dialog {
+  width: min(640px, calc(100vw - 48px));
+}
+
+.token-dialog-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
+  gap: 14px;
 }
 
 .table-footer {
@@ -1450,9 +1542,12 @@ tr:last-child td {
     max-height: none;
   }
 
-  .access-panel-header,
-  .token-create-form {
+  .access-panel-header {
     grid-template-columns: 1fr;
+  }
+
+  .access-panel-header > .primary-button {
+    justify-self: start;
   }
 }
 
@@ -1483,6 +1578,15 @@ tr:last-child td {
   .button-row {
     align-items: stretch;
     flex-wrap: wrap;
+  }
+
+  .oauth-client-summary {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .oauth-client-summary .secondary-button {
+    justify-self: start;
   }
 
   .primary-button,
