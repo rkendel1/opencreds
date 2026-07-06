@@ -57,11 +57,12 @@ OpenConnector は、provider credential を Agent process に渡さずに、Agen
 Endpoint、response envelope、auth header、MCP tool、Action guide の例は
 [runtime-api.md](runtime-api.md) を参照してください。
 
-## Provider カバレッジプレビュー
+## ローカルコンソールプレビュー
 
-このプレビューでは、catalog 内の productivity app、developer tool、analytics product、AI service から認知度の高いものを示しています。
+OpenConnector には、providers の閲覧、credentials の設定、runtime token の作成、run log
+の確認に使えるローカル Web Console が含まれます。
 
-![Provider カバレッジプレビュー](../assets/saas-logo-wall.png)
+![OpenConnector ローカルコンソール](../assets/open-console-en.jpg)
 
 Provider 名と商標はそれぞれの権利者に帰属し、識別と相互運用性のためにのみ使用されています。
 

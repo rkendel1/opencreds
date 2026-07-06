@@ -63,12 +63,12 @@ handing provider credentials to the agent process.
 Endpoint details, response envelopes, auth headers, MCP tools, and Action guide examples are in
 [docs/runtime-api.md](docs/runtime-api.md).
 
-## Provider Coverage Preview
+## Local Console Preview
 
-This preview highlights recognizable productivity apps, developer tools, analytics products, and AI
-services from the catalog.
+OpenConnector ships with a local Web Console for browsing providers, configuring credentials,
+creating runtime tokens, and inspecting runs.
 
-![Provider coverage preview](assets/saas-logo-wall.png)
+![OpenConnector local console](assets/open-console-en.jpg)
 
 Provider names and trademarks belong to their respective owners and are used only for identification
 and interoperability.

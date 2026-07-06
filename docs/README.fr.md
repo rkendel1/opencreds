@@ -67,12 +67,12 @@ utilisateurs sans donner les provider credentials au processus agent.
 Consultez [runtime-api.md](runtime-api.md) pour les endpoints, response envelopes, auth headers,
 outils MCP et exemples d'Action guide.
 
-## Aperçu De La Couverture Provider
+## Aperçu de la console locale
 
-Cet aperçu met en avant des apps de productivité, outils développeur, produits d'analytics et
-services d'IA reconnaissables dans le catalog.
+OpenConnector inclut une console Web locale pour parcourir les providers, configurer les
+credentials, créer des runtime tokens et inspecter les runs.
 
-![Aperçu de la couverture provider](../assets/saas-logo-wall.png)
+![Console locale OpenConnector](../assets/open-console-en.jpg)
 
 Les noms et marques des providers appartiennent à leurs propriétaires respectifs et sont utilisés
 uniquement à des fins d'identification et d'interopérabilité.
