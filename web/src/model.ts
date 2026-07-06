@@ -133,6 +133,8 @@ export interface OverviewSummary {
   failedRuns: RunLog[];
 }
 
+const firstProviderService = "fusion-api";
+
 export const emptyData: AppData = {
   providers: [],
   connections: [],
@@ -187,6 +189,12 @@ export function sortProviders(
   connectionsByService: Map<string, ConnectionRecord>,
 ): ProviderDefinition[] {
   return [...providers].sort((left, right) => {
+    const leftPinned = left.service === firstProviderService;
+    const rightPinned = right.service === firstProviderService;
+    if (leftPinned !== rightPinned) {
+      return leftPinned ? -1 : 1;
+    }
+
     const leftConnected = connectionsByService.has(left.service);
     const rightConnected = connectionsByService.has(right.service);
     if (leftConnected !== rightConnected) {
