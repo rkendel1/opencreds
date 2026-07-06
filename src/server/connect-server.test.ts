@@ -293,6 +293,37 @@ describe("ConnectServer", () => {
     expect(JSON.stringify(body)).not.toContain("app-token");
   });
 
+  it("deletes OAuth client configs", async () => {
+    const app = createTestServer([oauthProvider]).createApp();
+
+    const config = await app.request("/api/oauth/configs/oauth_example", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        clientId: "client-id",
+        clientSecret: "client-secret",
+      }),
+    });
+    expect(config.status).toBe(200);
+
+    const deleted = await app.request("/api/oauth/configs/oauth_example", { method: "DELETE" });
+    expect(deleted.status).toBe(200);
+    await expect(deleted.json()).resolves.toEqual({
+      service: "oauth_example",
+      configured: false,
+    });
+
+    const configs = await app.request("/api/oauth/configs");
+    expect(configs.status).toBe(200);
+    await expect(configs.json()).resolves.toMatchObject([
+      {
+        service: "oauth_example",
+        configured: false,
+        clientId: null,
+      },
+    ]);
+  });
+
   it("logs connection and OAuth steps without credential values", async () => {
     const { entries, logger } = createTestLogger();
     const app = createTestServer([apiKeyProvider, oauthProvider], { logger }).createApp();

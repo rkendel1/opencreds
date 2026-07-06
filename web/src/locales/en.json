@@ -181,7 +181,8 @@
       "reconnectProvider": "Reconnect {{name}}",
       "disconnect": "Disconnect",
       "saveOAuthClient": "Save OAuth Client",
-      "updateOAuthClient": "Update OAuth Client"
+      "updateOAuthClient": "Update OAuth Client",
+      "resetOAuthClient": "Reset OAuth Client"
     },
     "oauthClientSettings": {
       "configuredTitle": "OAuth client configured",
@@ -192,7 +193,10 @@
       "storedSecretHint": "Stored secret is not shown. Enter it again when saving changes.",
       "saving": "Saving OAuth client...",
       "saved": "OAuth client saved.",
-      "failed": "Failed to save OAuth client."
+      "failed": "Failed to save OAuth client.",
+      "resetting": "Resetting OAuth client...",
+      "reset": "OAuth client reset.",
+      "resetFailed": "Failed to reset OAuth client."
     },
     "execution": {
       "executable": "Executable",

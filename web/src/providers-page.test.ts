@@ -1,11 +1,17 @@
-import type { AuthDefinition } from "./model";
+import type { AppData, AuthDefinition, ProviderDefinition } from "./model";
 
+import { I18nProvider } from "@embra/i18n/react";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
+import { createAppI18n } from "./i18n";
 import {
   connectionSubmitLabel,
   createOAuthPopupFeatures,
   oauthClientActionLabel,
   oauthConfigForProvider,
+  ProvidersPage,
   shouldEnableConnectionSubmit,
   shouldShowConnectionActions,
   shouldShowDisconnectAction,
@@ -94,6 +100,24 @@ describe("oauthClientActionLabel", () => {
   });
 });
 
+describe("ProvidersPage OAuth client settings", () => {
+  it("shows a reset action for saved OAuth client settings", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        I18nProvider,
+        { i18n: createAppI18n("en") },
+        createElement(
+          MemoryRouter,
+          { initialEntries: ["/providers/gmail"] },
+          createElement(ProvidersPage, { data: providerData, onRefresh() {} }),
+        ),
+      ),
+    );
+
+    expect(markup).toContain("Reset OAuth Client");
+  });
+});
+
 describe("createOAuthPopupFeatures", () => {
   it("creates centered OAuth popup window features", () => {
     expect(
@@ -106,6 +130,28 @@ describe("createOAuthPopupFeatures", () => {
     ).toBe("popup=yes,width=520,height=720,left=440,top=140,resizable=yes,scrollbars=yes,noopener,noreferrer");
   });
 });
+
+const oauthProvider: ProviderDefinition = {
+  service: "gmail",
+  displayName: "Gmail",
+  categories: ["Productivity"],
+  authTypes: ["oauth2"],
+  auth: [
+    {
+      type: "oauth2",
+      scopes: ["email"],
+    },
+  ],
+  actions: [],
+};
+
+const providerData: AppData = {
+  providers: [oauthProvider],
+  connections: [],
+  oauthConfigs: [{ service: "gmail", configured: true, clientId: "gmail-client-id" }],
+  runtimeTokens: [],
+  runs: [],
+};
 
 describe("oauthConfigForProvider", () => {
   it("finds the saved OAuth config for the selected provider", () => {

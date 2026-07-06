@@ -922,6 +922,13 @@ h3 {
   white-space: nowrap;
 }
 
+.oauth-client-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .oauth-client-editor {
   padding-top: 2px;
 }
@@ -1638,6 +1645,10 @@ tr:last-child td {
 
   .oauth-client-summary .secondary-button {
     justify-self: start;
+  }
+
+  .oauth-client-actions {
+    justify-content: flex-start;
   }
 
   .primary-button,

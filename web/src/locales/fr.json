@@ -181,7 +181,8 @@
       "reconnectProvider": "Reconnecter {{name}}",
       "disconnect": "Déconnecter",
       "saveOAuthClient": "Enregistrer le client OAuth",
-      "updateOAuthClient": "Mettre à jour le client OAuth"
+      "updateOAuthClient": "Mettre à jour le client OAuth",
+      "resetOAuthClient": "Réinitialiser le client OAuth"
     },
     "oauthClientSettings": {
       "configuredTitle": "Client OAuth configuré",
@@ -192,7 +193,10 @@
       "storedSecretHint": "Le secret enregistré n’est pas affiché. Saisissez-le à nouveau pour enregistrer les modifications.",
       "saving": "Enregistrement du client OAuth...",
       "saved": "Client OAuth enregistré.",
-      "failed": "Échec de l’enregistrement du client OAuth."
+      "failed": "Échec de l’enregistrement du client OAuth.",
+      "resetting": "Réinitialisation du client OAuth...",
+      "reset": "Client OAuth réinitialisé.",
+      "resetFailed": "Échec de la réinitialisation du client OAuth."
     },
     "execution": {
       "executable": "Exécutable",

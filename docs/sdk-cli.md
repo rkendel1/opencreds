@@ -19,22 +19,25 @@ Install:
 npm install @oomol-lab/connector
 ```
 
-Minimal usage:
+For the self-hosted OpenConnector runtime, use `OpenConnector`:
 
 ```ts
-import { Connector } from "@oomol-lab/connector";
+import { OpenConnector } from "@oomol-lab/connector";
 
-const connector = new Connector({
-  apiKey: process.env.OOMOL_API_KEY!,
-  baseUrl: "http://localhost:3000/v1",
+const open = new OpenConnector({
+  baseUrl: "http://localhost:3000",
+  runtimeToken: process.env.OOMOL_CONNECT_RUNTIME_TOKEN,
 });
 
-const user = await connector.github.get_current_user({});
-console.log(user);
+const stories = await open.hackernews.get_top_stories({});
+console.log(stories);
 ```
 
 The SDK keeps provider credentials behind the gateway. The client sends connector API requests; the
 runtime authorizes and executes the provider Action.
+
+For an end-to-end Gmail OAuth and SDK example, see
+[gmail-oauth-sdk.md](gmail-oauth-sdk.md).
 
 ## oo CLI
 

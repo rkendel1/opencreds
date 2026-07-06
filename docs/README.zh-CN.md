@@ -188,6 +188,7 @@ provider catalog，同时保持兼容的 connector 接口和 Action 契约。
 
 - [快速开始](quickstart.md)
 - [开发者工具](sdk-cli.md)
+- [Gmail OAuth 和 SDK 接入教程](gmail-oauth-sdk.zh-CN.md)
 - [Provider 覆盖](providers.md)
 - [Runtime API 和 MCP](runtime-api.md)
 - [Cloudflare 部署](cloudflare.md)
