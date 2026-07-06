@@ -129,7 +129,7 @@ export function OverviewPage(props: OverviewPageProps): ReactNode {
 function RunSummaryTable(props: { runs: AppData["runs"] }): ReactNode {
   const t = useTranslate();
   return (
-    <table>
+    <table className="summary-table">
       <thead>
         <tr>
           <th>{t("overview.table.action")}</th>

@@ -1371,6 +1371,11 @@ table {
   border-collapse: collapse;
 }
 
+.summary-table th,
+.summary-table td {
+  white-space: nowrap;
+}
+
 th,
 td {
   padding: 10px 14px;
