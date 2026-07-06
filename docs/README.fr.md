@@ -1,6 +1,6 @@
 <div align="center">
 
-# OpenConnector
+<img src="../assets/openconnector-readme-banner.png" alt="OpenConnector - Connect Once. Use Everywhere." width="100%" />
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [Français](README.fr.md)
 
@@ -19,29 +19,25 @@ OpenConnector est une alternative open source à Composio pour l'authentificatio
 et les intégrations prêts pour les agents. C'est une couche connector pour les agents qui ont
 besoin d'un accès fiable aux comptes utilisateurs dans des applications externes. Elle gère
 l'authentification, l'exécution des outils et les intégrations orientées agents. Le catalog open
-source couvre actuellement 840+ providers et 8 300+ Actions prêtes à l'emploi, s'exécute en local
+source couvre actuellement 1 000 providers et 9 400+ Actions prêtes à l'emploi, s'exécute en local
 ou sur une infrastructure compatible Cloudflare, et expose les mêmes outils via le
-[Connector SDK](https://github.com/oomol-lab/connector-sdk), MCP, HTTP, OpenAPI et la Web Console
-locale.
+[Connector SDK](https://github.com/oomol-lab/connector-sdk),
+[oo CLI](https://github.com/oomol-lab/oo-cli), MCP, HTTP, OpenAPI et la Web Console locale.
 
 OpenConnector donne aux agents un chemin contrôlé vers de vrais produits tout en gardant les
 credentials, scopes, schemas, policies et journaux d'exécution dans un runtime inspectable. Le
 gateway, le provider catalog et les Action executors sont open source, afin que les équipes puissent
 examiner les contrats, étendre les providers et contrôler la frontière de déploiement.
 
-Le catalog open source correspond à la partie du connector catalog d'OOMOL dont la migration vers
-des définitions et executors de providers maintenables est terminée. Le produit OOMOL hébergé
-couvre aujourd'hui 1 000+ providers. Les deux surfaces utilisent des connector interfaces et des
-Action contracts compatibles, afin que les équipes puissent commencer vite avec l'offre hébergée,
-puis déplacer la même couche connector vers une infrastructure runtime privée ou self-hosted.
-
-La prise en charge du runtime open source dans [oo CLI](https://github.com/oomol-lab/oo-cli) est en
-cours d'ajout et vise mi-juillet 2026. En attendant, utilisez les chemins SDK, MCP, HTTP API,
-OpenAPI et Web Console locale ci-dessous.
+Le provider et Action catalog a terminé sa migration vers des provider definitions et executors
+maintenables, et ses contracts sont alignés entre le runtime open source et le runtime SaaS
+commercial d'OOMOL. Les mêmes provider ids, Action ids, schemas, modèle SDK, commandes connector
+CLI, MCP, HTTP et surfaces OpenAPI permettent aux équipes de passer entre runtime hébergé, privé et
+self-hosted sans changer l'integration contract.
 
 ## Ce Que Fournit OpenConnector
 
-- Un connector catalog prêt à l'emploi : [840+ providers et 8 300+ Actions prêtes à l'emploi](providers.md),
+- Un connector catalog prêt à l'emploi : [1 000 providers et 9 400+ Actions prêtes à l'emploi](providers.md),
   couvrant GitHub, Gmail, Notion, BigQuery, Google Analytics, Supabase, Airtable, Slack et d'autres
   produits.
 - Une gestion centralisée des credentials dans un seul runtime : API keys, OAuth2, custom
@@ -51,9 +47,8 @@ OpenAPI et Web Console locale ci-dessous.
 - Des options de déploiement adaptées à différentes frontières runtime : Docker ou Node.js en local
   pour le développement, plus un déploiement compatible Cloudflare sur Workers, D1, R2 et Static
   Assets.
-- Des interfaces pour agents : [Connector SDK](https://github.com/oomol-lab/connector-sdk), MCP,
-  HTTP API, OpenAPI et Web Console locale, avec
-  [oo CLI](https://github.com/oomol-lab/oo-cli) en cours d'adaptation au runtime open source.
+- Des interfaces pour agents : [Connector SDK](https://github.com/oomol-lab/connector-sdk),
+  [oo CLI](https://github.com/oomol-lab/oo-cli), MCP, HTTP API, OpenAPI et Web Console locale.
 - Des garde-fous runtime pour la production : connection identity, scopes, runtime tokens, action
   allow/block policies, transit temporaire de fichiers et journaux d'exécution masqués.
 
@@ -61,8 +56,8 @@ OpenAPI et Web Console locale ci-dessous.
 
 OpenConnector convient aux produits où les agents doivent travailler dans les outils déjà utilisés
 par les utilisateurs, avec une frontière opérationnelle claire pour les credentials, scopes, schemas
-et journaux d'exécution. Les versions hébergée et open source restent compatibles au niveau des
-interfaces, afin que la même couche connector puisse passer du service hébergé OOMOL à une
+et journaux d'exécution. Les versions hébergée et open source utilisent des provider et Action
+contracts alignés, afin que la même couche connector puisse passer du service hébergé OOMOL à une
 infrastructure privée ou self-hosted selon les exigences de déploiement.
 
 - Produits d'agents qui nécessitent un accès réutilisable aux apps de travail, outils développeur,
@@ -74,12 +69,19 @@ infrastructure privée ou self-hosted selon les exigences de déploiement.
 
 ## Outils Développeur
 
-| Outil                                                       | Rôle                                                                                                                           |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| [Connector SDK](https://github.com/oomol-lab/connector-sdk) | Appeler des connector Actions, proxy des upstream APIs et inspecter le catalog depuis des apps TypeScript et runtimes d'agent. |
-| [oo CLI](https://github.com/oomol-lab/oo-cli)               | La prise en charge du runtime open source est en cours d'ajout et vise mi-juillet 2026.                                        |
-| MCP                                                         | Exposer les Actions d'app à des hosts d'agents compatibles MCP via `http://localhost:3000/mcp`.                                |
-| HTTP / OpenAPI                                              | Appeler directement `/v1/actions/*` ou inspecter le document `/openapi.json` généré.                                           |
+| Outil                                                       | Rôle                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Connector SDK](https://github.com/oomol-lab/connector-sdk) | Appeler des connector Actions, proxy des upstream APIs et inspecter le catalog depuis des apps TypeScript et runtimes d'agent. Utilisez `OpenConnector` pour un runtime self-hosted et `Connector` ou `ProjectConnector` pour un runtime OOMOL hébergé. |
+| [oo CLI](https://github.com/oomol-lab/oo-cli)               | Permet aux agents locaux de découvrir, inspecter et exécuter des connector Actions. Les connector commands peuvent router vers un runtime OOMOL hébergé ou un runtime OpenConnector self-hosted.                                                        |
+| MCP                                                         | Exposer les Actions d'app à des hosts d'agents compatibles MCP via `http://localhost:3000/mcp`.                                                                                                                                                         |
+| HTTP / OpenAPI                                              | Appeler directement `/v1/actions/*` ou inspecter le document `/openapi.json` généré.                                                                                                                                                                    |
+
+## Projets Open Source Associés
+
+| Projet                                                      | Rôle                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Connector SDK](https://github.com/oomol-lab/connector-sdk) | Client HTTP TypeScript léger pour les connector gateways. Il n'exécute aucune provider logic localement : OAuth, credentials, provider calls et response envelopes restent sur le gateway. Utilisez `Connector` pour les hosted personal connections, `ProjectConnector` pour les SaaS end-user connections et `OpenConnector` pour les self-hosted runtimes. |
+| [oo CLI](https://github.com/oomol-lab/oo-cli)               | Command surface locale pour les agents. Les `oo connector` commands peuvent chercher, inspecter et exécuter des Actions sur les runtimes OOMOL-hosted ou OpenConnector self-hosted ; `OO_CONNECTOR_URL` et `OO_CONNECTOR_TOKEN` servent au routing headless et CI.                                                                                            |
 
 ## Aperçu De La Couverture Provider
 
@@ -96,13 +98,13 @@ uniquement à des fins d'identification et d'interopérabilité.
 
 ```mermaid
 flowchart LR
-  Agent["AI Agent / App"] -->|"SDK / MCP / HTTP"| Gateway["OpenConnector Gateway"]
+  Agent["AI Agent / App"] -->|"SDK / CLI / MCP / HTTP"| Gateway["OpenConnector Gateway"]
   Gateway --> Auth["Credential & OAuth Boundary"]
   Gateway --> Catalog["Provider Catalog"]
   Gateway --> Actions["Open-source Action Executors"]
   Gateway --> Policy["Tokens, Scopes, Allow/Block Policy"]
   Gateway --> Logs["Run Logs"]
-  Actions --> Providers["840+ Providers"]
+  Actions --> Providers["1,000 Providers"]
   Console["Web Console"] --> Gateway
   Cloudflare["Cloudflare Workers, D1, R2"] -. deploy .-> Gateway
 ```
@@ -114,11 +116,11 @@ nécessaires à la run.
 
 ## Parcours D'utilisation
 
-| Parcours                          | Idéal pour                                                          | Inclus                                                                                                                                             |
-| --------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open source self-host             | Développeurs et équipes qui veulent un contrôle total               | Runtime Docker ou Node local, stockage SQLite, MCP, HTTP, OpenAPI et Web Console                                                                   |
-| Déploiement compatible Cloudflare | Équipes qui veulent un runtime hébergé léger                        | Workers runtime, état D1, fichiers de transit R2 et Static Assets pour la console                                                                  |
-| [OOMOL](https://oomol.com/)       | Équipes bloquées par l'approbation OAuth ou les délais de lancement | Auth hébergée, runtime et catalog de 1 000+ providers ; compatible avec l'interface open source pour un déploiement privé ou self-hosted ultérieur |
+| Parcours                          | Idéal pour                                                          | Inclus                                                                                                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open source self-host             | Développeurs et équipes qui veulent un contrôle total               | Runtime Docker ou Node local, stockage SQLite, MCP, HTTP, OpenAPI et Web Console                                                                                                 |
+| Déploiement compatible Cloudflare | Équipes qui veulent un runtime hébergé léger                        | Workers runtime, état D1, fichiers de transit R2 et Static Assets pour la console                                                                                                |
+| [OOMOL](https://oomol.com/)       | Équipes bloquées par l'approbation OAuth ou les délais de lancement | Auth hébergée et infrastructure runtime avec les mêmes provider et Action contracts ; compatible avec l'interface open source pour un déploiement privé ou self-hosted ultérieur |
 
 ## Vidéo De Démarrage Rapide Cloudflare
 
@@ -178,6 +180,8 @@ consultez [credentials.md](credentials.md) et [configuration.md](configuration.m
 
 OpenConnector expose le même Action catalog via plusieurs interfaces orientées agents :
 
+- SDK : `OpenConnector` depuis `@oomol-lab/connector`
+- oo CLI : `oo connector login`, `oo connector search`, `oo connector schema` et `oo connector run`
 - MCP : `http://localhost:3000/mcp`
 - HTTP runtime API : `/v1/actions`
 - Document OpenAPI : `/openapi.json`
@@ -207,8 +211,8 @@ secrets, la preview Worker locale et le déploiement distant.
 Les équipes peuvent choisir le parcours produit correspondant au niveau de propriété runtime
 souhaité. [OpenConnector](https://github.com/oomol-lab/open-connector) fournit le self-hosting open
 source et le contrôle du déploiement. [OOMOL](https://oomol.com/) fournit l'auth hébergée,
-l'infrastructure runtime et le catalog plus large de 1 000+ providers tout en conservant des
-connector interfaces et Action contracts compatibles.
+l'infrastructure runtime et les mêmes provider et Action contracts tout en conservant des connector
+interfaces compatibles.
 
 Pour les petites équipes ou les individus utilisant directement un Agent desktop,
 [Wanta](https://wanta.ai/) connecte les apps via une expérience produit desktop avec team app

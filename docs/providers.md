@@ -2,8 +2,8 @@
 
 This repository currently contains:
 
-- 842 providers
-- 8,310 prebuilt Actions
+- 1,000 providers
+- 9,487 prebuilt Actions
 
 These numbers are counted from `src/providers` in this repository. Recount them with:
 
@@ -37,8 +37,8 @@ more.
 
 当前仓库包含：
 
-- 842 个 provider
-- 8,310 个预置 Action
+- 1,000 个 provider
+- 9,487 个预置 Action
 
 这些数字来自本仓库的 `src/providers`。可以使用上面的命令重新统计。
 
