@@ -386,8 +386,6 @@ export function createOAuthPopupFeatures(placement: OAuthPopupPlacement): string
     `top=${top}`,
     "resizable=yes",
     "scrollbars=yes",
-    "noopener",
-    "noreferrer",
   ].join(",");
 }
 
