@@ -73,7 +73,6 @@ export interface RuntimeTokenSummary {
   name: string;
   createdAt: string;
   lastUsedAt?: string;
-  revokedAt?: string;
 }
 
 export interface RuntimeTokenCreation {
@@ -149,7 +148,7 @@ export function createOverviewSummary(data: AppData): OverviewSummary {
     providerCount: data.providers.length,
     actionCount: actions.length,
     connectedCount: data.connections.length,
-    activeTokenCount: data.runtimeTokens.filter((token) => !token.revokedAt).length,
+    activeTokenCount: data.runtimeTokens.length,
     failedRuns: data.runs.filter((run) => !run.ok).slice(0, 5),
   };
 }

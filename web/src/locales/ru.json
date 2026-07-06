@@ -19,7 +19,6 @@
     "open": "Открыть",
     "refresh": "Обновить",
     "required": "Обязательно",
-    "revoked": "Отозван",
     "runtimeReady": "Runtime готов",
     "showMore": "Показать еще",
     "showing": "Показано {{shown}} из {{total}}",

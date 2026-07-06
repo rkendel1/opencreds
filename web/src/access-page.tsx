@@ -123,21 +123,15 @@ export function AccessPage(props: AccessPageProps): ReactNode {
                     <strong>{token.name}</strong>
                   </td>
                   <td>
-                    {token.revokedAt ? (
-                      <Badge>{t("common.revoked")}</Badge>
-                    ) : (
-                      <Badge tone="success">{t("common.active")}</Badge>
-                    )}
+                    <Badge tone="success">{t("common.active")}</Badge>
                   </td>
                   <td>{formatDate(token.createdAt)}</td>
                   <td>{token.lastUsedAt ? formatDate(token.lastUsedAt) : ""}</td>
                   <td className="table-actions">
-                    {!token.revokedAt ? (
-                      <button className="secondary-button compact" onClick={() => void revoke(token.id)}>
-                        <Trash2 size={15} />
-                        {t("access.revoke")}
-                      </button>
-                    ) : null}
+                    <button className="secondary-button compact" onClick={() => void revoke(token.id)}>
+                      <Trash2 size={15} />
+                      {t("access.revoke")}
+                    </button>
                   </td>
                 </tr>
               ))}

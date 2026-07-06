@@ -875,10 +875,14 @@ describe("ConnectServer", () => {
     expect(revoked.status).toBe(200);
     await expect(revoked.json()).resolves.toEqual({ id: createdBody.record.id, revoked: true });
 
-    const revokedUnauthorized = await app.request("/v1/actions", {
+    const listedAfterRevoke = await app.request("/api/runtime-tokens");
+    expect(listedAfterRevoke.status).toBe(200);
+    await expect(listedAfterRevoke.json()).resolves.toEqual([]);
+
+    const reopened = await app.request("/v1/actions", {
       headers: { authorization: `Bearer ${createdBody.token}` },
     });
-    expect(revokedUnauthorized.status).toBe(401);
+    expect(reopened.status).toBe(200);
   });
 
   it("stores redacted run log summaries for HTTP action execution", async () => {
@@ -1800,19 +1804,13 @@ class MemoryRuntimeTokenStore implements IRuntimeTokenStore {
     );
   }
 
-  async revoke(id: string, revokedAt: string): Promise<boolean> {
-    const token = this.tokens.get(id);
-    if (!token || token.revokedAt) {
-      return false;
-    }
-
-    this.tokens.set(id, { ...token, revokedAt });
-    return true;
+  async revoke(id: string): Promise<boolean> {
+    return this.tokens.delete(id);
   }
 
   async markUsed(id: string, usedAt: string): Promise<void> {
     const token = this.tokens.get(id);
-    if (token && !token.revokedAt) {
+    if (token) {
       this.tokens.set(id, { ...token, lastUsedAt: usedAt });
     }
   }

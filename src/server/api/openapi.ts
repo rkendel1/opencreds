@@ -296,7 +296,6 @@ export function createOpenApiDocument(
             name: jsonSchema.string({ description: "User-facing token label." }),
             createdAt: jsonSchema.string({ description: "Creation timestamp." }),
             lastUsedAt: jsonSchema.string({ description: "Last successful use timestamp." }),
-            revokedAt: jsonSchema.string({ description: "Revocation timestamp." }),
           },
           {
             required: ["id", "name", "createdAt"],
