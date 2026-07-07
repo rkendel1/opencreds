@@ -30,7 +30,6 @@ interface GeneratedProxyDefinition {
 type GeneratedProxyBaseUrl = string | { fields: string[] };
 
 const manualProxyDefinitions = new Map<string, Omit<GeneratedProxyDefinition, "service">>([
-  ["adyen", { baseUrl: "https://management-test.adyen.com/v3", auth: { type: "api_key_header", name: "x-api-key" } }],
   ["agenty", { baseUrl: "https://api.agenty.com/v2", auth: { type: "api_key_header", name: "x-agenty-apikey" } }],
   [
     "alchemy",
@@ -154,6 +153,169 @@ const manualProxyDefinitions = new Map<string, Omit<GeneratedProxyDefinition, "s
     },
   ],
   ["zenserp", { baseUrl: "https://app.zenserp.com", auth: { type: "api_key_header", name: "apikey" } }],
+  ["abyssale", { baseUrl: "https://api.abyssale.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["activecampaign", { baseUrl: { fields: ["apiUrl"] }, auth: { type: "api_key_header", name: "api-token" } }],
+  ["agentql", { baseUrl: "https://api.agentql.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["aivoov", { baseUrl: "https://aivoov.com/api/v8", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["alt_text_ai", { baseUrl: "https://alttext.ai/api/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["amara", { baseUrl: "https://amara.org/api", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "anchor_browser",
+    { baseUrl: "https://api.anchorbrowser.io", auth: { type: "api_key_header", name: "anchor-api-key" } },
+  ],
+  ["anthropic", { baseUrl: "https://api.anthropic.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["anthropic_admin", { baseUrl: "https://api.anthropic.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["autobound", { baseUrl: "https://signals.autobound.ai", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["beamer", { baseUrl: "https://api.getbeamer.com/v0", auth: { type: "api_key_header", name: "beamer-api-key" } }],
+  ["boloforms", { baseUrl: "https://sapi.boloforms.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["bouncer", { baseUrl: "https://api.usebouncer.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["brevo", { baseUrl: "https://api.brevo.com", auth: { type: "api_key_header", name: "api-key" } }],
+  ["browserbase", { baseUrl: "https://api.browserbase.com", auth: { type: "api_key_header", name: "x-bb-api-key" } }],
+  [
+    "campaign_cleaner",
+    { baseUrl: "https://api.campaigncleaner.com", auth: { type: "api_key_header", name: "x-cc-api-key" } },
+  ],
+  ["cardly", { baseUrl: "https://api.card.ly/v2", auth: { type: "api_key_header", name: "api-key" } }],
+  ["central_station_crm", { baseUrl: { fields: ["apiBaseUrl"] }, auth: { type: "api_key_header", name: "x-apikey" } }],
+  ["circleci", { baseUrl: "https://circleci.com/api/v2", auth: { type: "api_key_header", name: "circle-token" } }],
+  ["clockify", { baseUrl: "https://api.clockify.me/api/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["cloudlayer", { baseUrl: "https://api.cloudlayer.io", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["codacy", { baseUrl: "https://app.codacy.com", auth: { type: "api_key_header", name: "api-token" } }],
+  [
+    "coderabbit",
+    { baseUrl: "https://api.coderabbit.ai", auth: { type: "api_key_header", name: "x-coderabbitai-api-key" } },
+  ],
+  [
+    "coinmarketcal",
+    { baseUrl: "https://developers.coinmarketcal.com/v1", auth: { type: "api_key_header", name: "x-api-key" } },
+  ],
+  ["craftmypdf", { baseUrl: "https://api.craftmypdf.com/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["databox", { baseUrl: "https://api.databox.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["devto", { baseUrl: "https://dev.to/api", auth: { type: "api_key_header", name: "api-key" } }],
+  ["e2b", { baseUrl: "https://api.e2b.app", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["elevenreader", { baseUrl: "https://api.elevenlabs.io/v1", auth: { type: "api_key_header", name: "xi-api-key" } }],
+  ["elevio", { baseUrl: "https://api.elev.io/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["encodian", { baseUrl: "https://api.apps-encodian.com", auth: { type: "api_key_header", name: "x-apikey" } }],
+  ["espocrm", { baseUrl: { fields: ["baseUrl"] }, auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["fireberry", { baseUrl: "https://api.fireberry.com", auth: { type: "api_key_header", name: "tokenid" } }],
+  ["fluxguard", { baseUrl: "https://api.fluxguard.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["forem", { baseUrl: "https://dev.to", auth: { type: "api_key_header", name: "api-key" } }],
+  ["formbricks", { baseUrl: "https://app.formbricks.com/api/v2", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["freepik", { baseUrl: "https://api.magnific.com", auth: { type: "api_key_header", name: "x-magnific-api-key" } }],
+  ["gamma", { baseUrl: "https://public-api.gamma.app", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["gem", { baseUrl: "https://api.gem.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "gemini",
+    {
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      auth: { type: "api_key_header", name: "x-goog-api-key" },
+    },
+  ],
+  ["gigasheet", { baseUrl: "https://api.gigasheet.com", auth: { type: "api_key_header", name: "x-gigasheet-token" } }],
+  ["gitlab", { baseUrl: "https://gitlab.com/api/v4", auth: { type: "api_key_header", name: "private-token" } }],
+  [
+    "healthchecks_io",
+    { baseUrl: "https://healthchecks.io/api/v3", auth: { type: "api_key_header", name: "x-api-key" } },
+  ],
+  ["hunter", { baseUrl: "https://api.hunter.io/v2", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["jigsawstack", { baseUrl: "https://api.jigsawstack.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["kit", { baseUrl: "https://api.kit.com/v4", auth: { type: "api_key_header", name: "x-kit-api-key" } }],
+  ["klangio", { baseUrl: "https://api.klang.io", auth: { type: "api_key_header", name: "kl-api-key" } }],
+  ["knack", { baseUrl: "https://api.knack.com/v1", auth: { type: "api_key_header", name: "x-knack-rest-api-key" } }],
+  ["leadmagic", { baseUrl: "https://api.leadmagic.io/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "listennotes",
+    { baseUrl: "https://listen-api.listennotes.com/api/v2", auth: { type: "api_key_header", name: "x-listenapi-key" } },
+  ],
+  ["lokalise", { baseUrl: "https://api.lokalise.com/api2", auth: { type: "api_key_header", name: "x-api-token" } }],
+  ["luma", { baseUrl: "https://public-api.luma.com", auth: { type: "api_key_header", name: "x-luma-api-key" } }],
+  ["mails_so", { baseUrl: "https://api.mails.so", auth: { type: "api_key_header", name: "x-mails-api-key" } }],
+  ["manus", { baseUrl: "https://api.manus.ai", auth: { type: "api_key_header", name: "x-manus-api-key" } }],
+  ["memberstack", { baseUrl: "https://admin.memberstack.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["motion", { baseUrl: "https://api.usemotion.com/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["n8n", { baseUrl: { fields: ["apiBaseUrl"] }, auth: { type: "api_key_header", name: "x-n8n-api-key" } }],
+  ["neutrino", { baseUrl: "https://neutrinoapi.net", auth: { type: "api_key_header", name: "api-key" } }],
+  ["nocodb", { baseUrl: { fields: ["baseUrl"] }, auth: { type: "api_key_header", name: "xc-token" } }],
+  ["nyne_ai", { baseUrl: "https://api.nyne.ai", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["onedesk", { baseUrl: "https://app.onedesk.com", auth: { type: "api_key_header", name: "od-public-api-key" } }],
+  ["owl_protocol", { baseUrl: "https://api.owl.build", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["paradym", { baseUrl: "https://api.paradym.id", auth: { type: "api_key_header", name: "x-access-token" } }],
+  ["parallel", { baseUrl: "https://api.parallel.ai", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["parsera", { baseUrl: "https://api.parsera.org", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["pdf_co", { baseUrl: "https://api.pdf.co", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["perigon", { baseUrl: "https://api.perigon.io", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["personal_ai", { baseUrl: "https://api.personal.ai", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["pinecone", { baseUrl: "https://api.pinecone.io", auth: { type: "api_key_header", name: "api-key" } }],
+  [
+    "postgrid",
+    { baseUrl: "https://api.postgrid.com/print-mail/v1", auth: { type: "api_key_header", name: "x-api-key" } },
+  ],
+  ["posthog", { baseUrl: { fields: ["baseUrl"] }, auth: { type: "api_key_authorization", prefix: "Bearer " } }],
+  [
+    "postmark",
+    { baseUrl: "https://api.postmarkapp.com", auth: { type: "api_key_header", name: "x-postmark-server-token" } },
+  ],
+  ["prerender", { baseUrl: "https://api.prerender.io", auth: { type: "api_key_header", name: "prerendertoken" } }],
+  [
+    "productive",
+    { baseUrl: "https://api.productive.io/api/v2/", auth: { type: "api_key_header", name: "x-auth-token" } },
+  ],
+  ["pushbullet", { baseUrl: "https://api.pushbullet.com/v2", auth: { type: "api_key_header", name: "access-token" } }],
+  ["redfox", { baseUrl: "https://redfox.hk", auth: { type: "api_key_header", name: "redfox_api_key" } }],
+  ["remove_bg", { baseUrl: "https://api.remove.bg/v1.0", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["retently", { baseUrl: "https://app.retently.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "scrape_graph_ai",
+    { baseUrl: "https://v2-api.scrapegraphai.com", auth: { type: "api_key_header", name: "sgai-apikey" } },
+  ],
+  ["ship_station", { baseUrl: "https://api.shipstation.com", auth: { type: "api_key_header", name: "api-key" } }],
+  ["shipengine", { baseUrl: "https://api.shipengine.com", auth: { type: "api_key_header", name: "api-key" } }],
+  ["short_menu", { baseUrl: "https://api.shortmenu.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "shortcut",
+    { baseUrl: "https://api.app.shortcut.com/api/v3/", auth: { type: "api_key_header", name: "shortcut-token" } },
+  ],
+  ["signwell", { baseUrl: "https://www.signwell.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["simla", { baseUrl: { fields: ["apiBaseUrl"] }, auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["simplesat", { baseUrl: "https://api.simplesat.io", auth: { type: "api_key_header", name: "x-simplesat-token" } }],
+  ["skyfire", { baseUrl: "https://api.skyfire.xyz", auth: { type: "api_key_header", name: "skyfire-api-key" } }],
+  ["slite", { baseUrl: "https://api.slite.com", auth: { type: "api_key_header", name: "x-slite-api-key" } }],
+  ["starton", { baseUrl: "https://api.starton.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["statista", { baseUrl: "https://api.statista.ai", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["stormboard", { baseUrl: "https://api.stormboard.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["subvisory", { baseUrl: "https://www.subvisory.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["supadata", { baseUrl: "https://api.supadata.ai/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["superchat", { baseUrl: "https://api.superchat.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "supervisely",
+    { baseUrl: "https://app.supervisely.com/public/api/v3", auth: { type: "api_key_header", name: "x-api-key" } },
+  ],
+  [
+    "surecontact",
+    { baseUrl: "https://api.surecontact.com/api/v1/public", auth: { type: "api_key_header", name: "x-api-key" } },
+  ],
+  ["systeme_io", { baseUrl: "https://api.systeme.io", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["talentlms", { baseUrl: { fields: ["apiBaseUrl"] }, auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["teltel", { baseUrl: "https://api.teltel.io/v2", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["the_dog_api", { baseUrl: "https://api.thedogapi.com/v1/", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["the_swarm", { baseUrl: "https://bee.theswarm.com", auth: { type: "api_key_header", name: "x-api-key" } }],
+  [
+    "tiktok_business",
+    { baseUrl: "https://business-api.tiktok.com", auth: { type: "api_key_header", name: "Access-Token" } },
+  ],
+  [
+    "triple_whale",
+    { baseUrl: "https://api.triplewhale.com/api/v2/", auth: { type: "api_key_header", name: "x-api-key" } },
+  ],
+  ["twitterapi_io", { baseUrl: "https://api.twitterapi.io", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["twochat", { baseUrl: "https://api.p.2chat.io", auth: { type: "api_key_header", name: "x-user-api-key" } }],
+  ["updown_io", { baseUrl: "https://updown.io", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["urlscan", { baseUrl: "https://urlscan.io", auth: { type: "api_key_header", name: "api-key" } }],
+  ["valyu", { baseUrl: "https://api.valyu.ai", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["virustotal", { baseUrl: "https://www.virustotal.com/api/v3", auth: { type: "api_key_header", name: "x-apikey" } }],
+  ["waterfall", { baseUrl: "https://api.waterfall.io", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["you", { baseUrl: "https://api.you.com/v1", auth: { type: "api_key_header", name: "x-api-key" } }],
+  ["yuandian", { baseUrl: "https://open.chineselaw.com/open", auth: { type: "api_key_header", name: "x-api-key" } }],
 ]);
 
 function propertyName(service: string): string {
@@ -409,30 +571,6 @@ function readApiKeyHeaderAuth(source: string): GeneratedProxyAuth | undefined {
     return { type: "api_key_header", name: "accesskey" };
   }
 
-  for (const match of source.matchAll(
-    /["']([A-Za-z0-9_-]*(?:api|token|subscription)[A-Za-z0-9_-]*)["']\s*:\s*(?:(?:input\.)?(?:context\.)?(?:input\.context\.)?(?:options\.)?apiKey|apiKey)\b/giu,
-  )) {
-    const name = match[1]!.toLowerCase();
-    if (name === "authorization") {
-      return { type: "api_key_authorization", prefix: "" };
-    }
-    if (!isLikelyApiKeyQueryName(name)) {
-      return { type: "api_key_header", name };
-    }
-  }
-
-  for (const match of source.matchAll(
-    /\b([A-Za-z0-9_-]*(?:api|token|subscription)[A-Za-z0-9_-]*)\s*:\s*(?:(?:input\.)?(?:context\.)?(?:input\.context\.)?(?:options\.)?apiKey|apiKey)\b/giu,
-  )) {
-    const name = match[1]!.toLowerCase();
-    if (name === "authorization") {
-      return { type: "api_key_authorization", prefix: "" };
-    }
-    if (!isLikelyApiKeyQueryName(name)) {
-      return { type: "api_key_header", name };
-    }
-  }
-
   return undefined;
 }
 
@@ -468,10 +606,6 @@ function readApiKeyQueryAuth(source: string): GeneratedProxyAuth | undefined {
   }
 
   return undefined;
-}
-
-function isLikelyApiKeyQueryName(name: string): boolean {
-  return ["api_key", "apikey", "access_key", "access_token", "key", "token"].includes(name.toLowerCase());
 }
 
 function renderGeneratedProxyDefinition(definition: GeneratedProxyDefinition): string {

@@ -2,7 +2,7 @@ import type { ExecutionContext, ResolvedCredential } from "../core/types.ts";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderLoader } from "./provider-loader.ts";
-import { executorModules } from "./registry.generated.ts";
+import { generatedProxyExecutors } from "./proxy.generated.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -64,16 +64,9 @@ describe("ProviderLoader proxy executors (generated)", () => {
     });
   });
 
-  it("loads a proxy executor for every provider", async () => {
-    const loader = new ProviderLoader();
-    const missing: string[] = [];
-    for (const service of Object.keys(executorModules).sort()) {
-      if (!(await loader.loadProxyExecutor(service))) {
-        missing.push(service);
-      }
-    }
-
-    expect(missing).toEqual([]);
+  it("does not generate proxies when credential fields are provider-local request data", () => {
+    expect(generatedProxyExecutors.telegram).toBeUndefined();
+    expect(generatedProxyExecutors.whatsapp).toBeUndefined();
   });
 
   it("loads generated provider proxy executors when the provider module has no explicit proxy", async () => {
@@ -85,15 +78,15 @@ describe("ProviderLoader proxy executors (generated)", () => {
     );
     vi.stubGlobal("fetch", fetcher);
     const loader = new ProviderLoader();
-    const proxy = await loader.loadProxyExecutor("gamma");
+    const proxy = await loader.loadProxyExecutor("a_leads");
 
     expect(proxy).toEqual(expect.any(Function));
 
     const credential: ResolvedCredential = {
       authType: "api_key",
-      apiKey: "gamma-key",
-      values: { apiKey: "gamma-key" },
-      profile: { accountId: "acct_1", displayName: "Gamma", grantedScopes: [] },
+      apiKey: "a-leads-key",
+      values: { apiKey: "a-leads-key" },
+      profile: { accountId: "acct_1", displayName: "A-Leads", grantedScopes: [] },
       metadata: {},
     };
     const context: ExecutionContext = {
@@ -101,17 +94,55 @@ describe("ProviderLoader proxy executors (generated)", () => {
     };
     await proxy?.(
       {
-        endpoint: "/v1.0/themes",
+        endpoint: "/search/verify-email",
         method: "GET",
       },
       context,
     );
 
-    expect(fetcher).toHaveBeenCalledWith(new URL("https://public-api.gamma.app/v1.0/themes"), expect.any(Object));
+    expect(fetcher).toHaveBeenCalledWith(
+      new URL("https://api.a-leads.co/gateway/v1/search/verify-email"),
+      expect.any(Object),
+    );
     const init = fetcher.mock.calls[0]![1] as RequestInit;
     expect(Object.fromEntries((init.headers as Headers).entries())).toMatchObject({
       "user-agent": "oomol-connect/0.1",
-      "x-api-key": "gamma-key",
+      "x-api-key": "a-leads-key",
+    });
+  });
+
+  it("loads manual generated proxy definitions when auth is not safe to infer automatically", async () => {
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
+        new Response(JSON.stringify({ data: [] }), {
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const proxy = await new ProviderLoader().loadProxyExecutor("anthropic");
+
+    expect(proxy).toEqual(expect.any(Function));
+
+    const credential: ResolvedCredential = {
+      authType: "api_key",
+      apiKey: "anthropic-key",
+      values: { apiKey: "anthropic-key" },
+      profile: { accountId: "acct_1", displayName: "Anthropic", grantedScopes: [] },
+      metadata: {},
+    };
+    await proxy?.(
+      {
+        endpoint: "/v1/models",
+        method: "GET",
+      },
+      { getCredential: async () => credential },
+    );
+
+    expect(fetcher).toHaveBeenCalledWith(new URL("https://api.anthropic.com/v1/models"), expect.any(Object));
+    const init = fetcher.mock.calls[0]![1] as RequestInit;
+    expect(Object.fromEntries((init.headers as Headers).entries())).toMatchObject({
+      "user-agent": "oomol-connect/0.1",
+      "x-api-key": "anthropic-key",
     });
   });
 

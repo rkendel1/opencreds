@@ -8,7 +8,7 @@ import { ConnectionError } from "../../connection-service.ts";
 import { optionalRecord, requiredString } from "../../core/cast.ts";
 import { mapConnectionErrorStatus } from "../api/runtime-api.ts";
 
-export type ProxyFailureStatus = 400 | 403 | 404 | 409 | 429 | 500 | 501;
+export type ProxyFailureStatus = 400 | 403 | 404 | 409 | 413 | 429 | 500 | 501;
 
 export interface ProxyRunnerOptions {
   catalog: CatalogStore;
@@ -107,7 +107,7 @@ export class ProxyRunner {
 
       const failure = {
         ok: false as const,
-        status: this.mapProxyErrorStatus(result.error.code),
+        status: this.mapProxyErrorStatus(result.error.code, result.error.details),
         errorCode: result.error.code,
         message: result.error.message,
         data: result.error.details ?? null,
@@ -205,7 +205,10 @@ export class ProxyRunner {
     return false;
   }
 
-  private mapProxyErrorStatus(code: string): ProxyFailureStatus {
+  private mapProxyErrorStatus(code: string, details: unknown): ProxyFailureStatus {
+    if (optionalRecord(details)?.status === 413) {
+      return 413;
+    }
     if (code === "authorization_failed") {
       return 403;
     }

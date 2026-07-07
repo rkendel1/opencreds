@@ -81,6 +81,27 @@ describe("ProviderLoader proxy executors (T-Z)", () => {
     expect((init.headers as Headers).get("apiKey")).toBe("teamcamp-key");
   });
 
+  it("loads explicit Telegram proxy executors with bot tokens in request paths", async () => {
+    const fetcher = stubProviderFetch();
+    const proxy = await new ProviderLoader().loadProxyExecutor("telegram");
+
+    expect(proxy).toEqual(expect.any(Function));
+
+    await proxy?.(
+      {
+        endpoint: "/getMe",
+        method: "GET",
+      },
+      {
+        getCredential: async () => apiKeyCredential("123456789:AA-test"),
+      },
+    );
+
+    const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://api.telegram.org/bot123456789:AA-test/getMe");
+    expect((init.headers as Headers).has("bottoken")).toBe(false);
+  });
+
   it("loads explicit Tencent Docs proxy executors with OpenAPI headers", async () => {
     const fetcher = stubProviderFetch();
     const proxy = await new ProviderLoader().loadProxyExecutor("tencent_docs");
@@ -665,6 +686,29 @@ describe("ProviderLoader proxy executors (T-Z)", () => {
 
     const [url] = fetcher.mock.calls[0] as [URL, RequestInit];
     expect(url.toString()).toBe("https://api.weatherbit.io/v2.0/current?city=Raleigh&key=weatherbit-key");
+  });
+
+  it("loads explicit WhatsApp proxy executors with Graph API bearer authorization", async () => {
+    const fetcher = stubProviderFetch();
+    const proxy = await new ProviderLoader().loadProxyExecutor("whatsapp");
+
+    expect(proxy).toEqual(expect.any(Function));
+
+    await proxy?.(
+      {
+        endpoint: "/me",
+        method: "GET",
+        query: { fields: "id,name" },
+      },
+      {
+        getCredential: async () => apiKeyCredential("whatsapp-token"),
+      },
+    );
+
+    const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://graph.facebook.com/v23.0/me?fields=id%2Cname");
+    expect((init.headers as Headers).get("authorization")).toBe("Bearer whatsapp-token");
+    expect((init.headers as Headers).has("accesstoken")).toBe(false);
   });
 
   it("loads explicit Jam proxy executors with API key headers", async () => {

@@ -196,6 +196,31 @@ describe("ProxyRunner", () => {
       message: "Rate limit exceeded.",
     });
   });
+
+  it("preserves proxy response payload limit failures as HTTP 413", async () => {
+    const runner = createRunner({
+      providerLoader: new TestProviderLoader(async () => ({
+        ok: false,
+        error: {
+          code: "invalid_input",
+          message: "proxy response exceeds 4 bytes",
+          details: { status: 413 },
+        },
+      })),
+    });
+
+    await expect(
+      runner.run({
+        service: "example",
+        input: { endpoint: "/items", method: "GET" },
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 413,
+      errorCode: "invalid_input",
+      message: "proxy response exceeds 4 bytes",
+    });
+  });
 });
 
 function createRunner(input: { connections?: ConnectionService; providerLoader: IProviderLoader }): ProxyRunner {

@@ -15,6 +15,27 @@ afterEach(() => {
 });
 
 describe("ProviderLoader proxy executors (A-C)", () => {
+  it("loads explicit Adyen proxy executors with the stored environment base URL", async () => {
+    const fetcher = stubProviderFetch();
+    const proxy = await new ProviderLoader().loadProxyExecutor("adyen");
+
+    expect(proxy).toEqual(expect.any(Function));
+
+    await proxy?.(
+      {
+        endpoint: "/me",
+        method: "GET",
+      },
+      {
+        getCredential: async () => apiKeyCredential("adyen-key", { environment: "live" }),
+      },
+    );
+
+    const [url, init] = fetcher.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://management-live.adyen.com/v3/me");
+    expect((init.headers as Headers).get("x-api-key")).toBe("adyen-key");
+  });
+
   it("loads explicit Alibaba Cloud OSS proxy executors with signed bucket requests", async () => {
     const fetcher = stubProviderFetch();
     const proxy = await new ProviderLoader().loadProxyExecutor("aliyun_oss");
