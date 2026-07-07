@@ -1301,7 +1301,17 @@ h3 {
   object-fit: contain;
 }
 
+.provider-icon-css-icon {
+  width: 22px;
+  height: 22px;
+}
+
 .provider-icon.large .provider-icon-image {
+  width: 28px;
+  height: 28px;
+}
+
+.provider-icon.large .provider-icon-css-icon {
   width: 28px;
   height: 28px;
 }
