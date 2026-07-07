@@ -189,6 +189,14 @@ export type ActionDefinition = {
     statusActionId: string;
     /** Optional action used to cancel async provider operation. */
     cancelActionId?: string;
+    /** Dot path into the start action's output holding the job/request id, e.g. "test.id" or "requestId". */
+    jobIdOutputPath?: string;
+    /** Field name to send that id as when calling the status action, e.g. "test_id" or "requestId". */
+    jobIdInputField?: string;
+    /** Dot path into the status action's output that signals completion, e.g. "is_complete" or "status". */
+    completionPath?: string;
+    /** Values at completionPath that mean the job is done vs. terminally failed. Anything else keeps polling. */
+    completionValues?: { done: unknown[]; failed?: unknown[] };
   };
 };
 
