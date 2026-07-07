@@ -2,15 +2,15 @@ import type { ExecutionContext, ResolvedCredential } from "../core/types.ts";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderLoader } from "./provider-loader.ts";
-import { generatedProxyExecutors } from "./proxy.generated.ts";
+import { registeredProxyExecutors } from "./proxy.registry.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe("ProviderLoader proxy executors (generated)", () => {
-  it("loads manual proxy executors with scoped endpoint coverage", async () => {
+describe("ProviderLoader proxy executors (registry)", () => {
+  it("loads registered proxy executors with scoped endpoint coverage", async () => {
     const fetcher = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
         new Response(JSON.stringify({ ok: true }), {
@@ -64,12 +64,19 @@ describe("ProviderLoader proxy executors (generated)", () => {
     });
   });
 
-  it("does not generate proxies when credential fields are provider-local request data", () => {
-    expect(generatedProxyExecutors.telegram).toBeUndefined();
-    expect(generatedProxyExecutors.whatsapp).toBeUndefined();
+  it("does not register proxies when credential fields are provider-local request data", () => {
+    expect(registeredProxyExecutors.addressfinder).toBeUndefined();
+    expect(registeredProxyExecutors.classmarker).toBeUndefined();
+    expect(registeredProxyExecutors.telegram).toBeUndefined();
+    expect(registeredProxyExecutors.whatsapp).toBeUndefined();
   });
 
-  it("loads generated provider proxy executors when the provider module has no explicit proxy", async () => {
+  it("does not register automatically inferred provider proxies", async () => {
+    expect(registeredProxyExecutors.a_leads).toBeUndefined();
+    await expect(new ProviderLoader().loadProxyExecutor("a_leads")).resolves.toBeUndefined();
+  });
+
+  it("loads registered proxy definitions with explicit API key header names", async () => {
     const fetcher = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
         new Response(JSON.stringify({ data: [] }), {
@@ -77,76 +84,34 @@ describe("ProviderLoader proxy executors (generated)", () => {
         }),
     );
     vi.stubGlobal("fetch", fetcher);
-    const loader = new ProviderLoader();
-    const proxy = await loader.loadProxyExecutor("a_leads");
+    const proxy = await new ProviderLoader().loadProxyExecutor("agenty");
 
     expect(proxy).toEqual(expect.any(Function));
 
     const credential: ResolvedCredential = {
       authType: "api_key",
-      apiKey: "a-leads-key",
-      values: { apiKey: "a-leads-key" },
-      profile: { accountId: "acct_1", displayName: "A-Leads", grantedScopes: [] },
-      metadata: {},
-    };
-    const context: ExecutionContext = {
-      getCredential: async () => credential,
-    };
-    await proxy?.(
-      {
-        endpoint: "/search/verify-email",
-        method: "GET",
-      },
-      context,
-    );
-
-    expect(fetcher).toHaveBeenCalledWith(
-      new URL("https://api.a-leads.co/gateway/v1/search/verify-email"),
-      expect.any(Object),
-    );
-    const init = fetcher.mock.calls[0]![1] as RequestInit;
-    expect(Object.fromEntries((init.headers as Headers).entries())).toMatchObject({
-      "user-agent": "oomol-connect/0.1",
-      "x-api-key": "a-leads-key",
-    });
-  });
-
-  it("loads manual generated proxy definitions when auth is not safe to infer automatically", async () => {
-    const fetcher = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
-        new Response(JSON.stringify({ data: [] }), {
-          headers: { "content-type": "application/json" },
-        }),
-    );
-    vi.stubGlobal("fetch", fetcher);
-    const proxy = await new ProviderLoader().loadProxyExecutor("anthropic");
-
-    expect(proxy).toEqual(expect.any(Function));
-
-    const credential: ResolvedCredential = {
-      authType: "api_key",
-      apiKey: "anthropic-key",
-      values: { apiKey: "anthropic-key" },
-      profile: { accountId: "acct_1", displayName: "Anthropic", grantedScopes: [] },
+      apiKey: "agenty-key",
+      values: { apiKey: "agenty-key" },
+      profile: { accountId: "acct_1", displayName: "Agenty", grantedScopes: [] },
       metadata: {},
     };
     await proxy?.(
       {
-        endpoint: "/v1/models",
+        endpoint: "/agents",
         method: "GET",
       },
       { getCredential: async () => credential },
     );
 
-    expect(fetcher).toHaveBeenCalledWith(new URL("https://api.anthropic.com/v1/models"), expect.any(Object));
+    expect(fetcher).toHaveBeenCalledWith(new URL("https://api.agenty.com/v2/agents"), expect.any(Object));
     const init = fetcher.mock.calls[0]![1] as RequestInit;
     expect(Object.fromEntries((init.headers as Headers).entries())).toMatchObject({
       "user-agent": "oomol-connect/0.1",
-      "x-api-key": "anthropic-key",
+      "x-agenty-apikey": "agenty-key",
     });
   });
 
-  it("keeps generated query API keys out of request headers", async () => {
+  it("keeps registered query API keys out of request headers", async () => {
     const fetcher = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
         new Response(JSON.stringify({ data: [] }), {

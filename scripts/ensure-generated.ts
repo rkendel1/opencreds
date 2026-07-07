@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 const rootDir = process.cwd();
 const registryPath = join(process.cwd(), "src/providers/registry.generated.ts");
-const proxyRegistryPath = join(process.cwd(), "src/providers/proxy.generated.ts");
 const catalogDir = join(process.cwd(), "catalog/apps");
 const sourcePaths = [
   join(rootDir, "src/core"),
@@ -12,11 +11,11 @@ const sourcePaths = [
   join(rootDir, "scripts/generate-catalog.ts"),
   join(rootDir, "scripts/generate-provider-registry.ts"),
 ];
-const generatedPaths = new Set([registryPath, proxyRegistryPath]);
+const generatedPaths = new Set([registryPath]);
 
 const sourceMtimeMs = await newestMtimeMs(sourcePaths);
 
-if (!(await isFreshFile(registryPath, sourceMtimeMs)) || !(await isFreshFile(proxyRegistryPath, sourceMtimeMs))) {
+if (!(await isFreshFile(registryPath, sourceMtimeMs))) {
   runNodeScript("scripts/generate-provider-registry.ts");
 }
 

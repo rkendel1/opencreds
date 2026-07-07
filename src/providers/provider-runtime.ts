@@ -128,11 +128,21 @@ export type ProviderProxyAuth =
 export type ProviderProxyBaseUrlResolver = (context: ExecutionContext, service: string) => Promise<string> | string;
 export type ProviderProxyBaseUrl = string | ProviderProxyBaseUrlResolver;
 
+export interface ProviderProxyRequestCustomizationInput {
+  context: ExecutionContext;
+  service: string;
+  endpoint: string;
+  url: URL;
+  headers: Headers;
+  credential?: ResolvedCredential;
+}
+
 export interface ProviderProxyDefinition {
   service: string;
   baseUrl: ProviderProxyBaseUrl;
   auth: ProviderProxyAuth;
   allowedEndpoint?: (endpoint: string) => boolean;
+  customizeRequest?: (input: ProviderProxyRequestCustomizationInput) => Promise<void> | void;
 }
 
 const blockedProxyRequestHeaders = new Set([
@@ -307,7 +317,15 @@ export function defineProviderProxy(input: ProviderProxyDefinition): ProviderPro
       );
       const headers = normalizeProviderProxyHeaders(proxyInput.headers);
       headers.set("user-agent", providerUserAgent);
-      await applyProviderProxyAuth(input, context, url, headers);
+      const credential = await applyProviderProxyAuth(input, context, url, headers);
+      await input.customizeRequest?.({
+        context,
+        service: input.service,
+        endpoint,
+        url,
+        headers,
+        credential,
+      });
 
       const init: RequestInit = {
         method: proxyInput.method,
@@ -381,39 +399,39 @@ async function applyProviderProxyAuth(
   context: ExecutionContext,
   url: URL,
   headers: Headers,
-): Promise<void> {
+): Promise<ResolvedCredential | undefined> {
   switch (input.auth.type) {
     case "none":
-      return;
+      return undefined;
     case "bearer": {
       const credential = await requireBearerCredential(context, input.service);
       headers.set("authorization", `${credential.tokenType} ${credential.accessToken}`);
-      return;
+      return undefined;
     }
     case "oauth_bearer": {
       const credential = await requireOAuthCredential(context, input.service);
       headers.set("authorization", `${credential.tokenType} ${credential.accessToken}`);
-      return;
+      return credential;
     }
     case "api_key_header": {
       const credential = await requireApiKeyCredential(context, input.service);
       headers.set(input.auth.name, credential.apiKey);
-      return;
+      return credential;
     }
     case "api_key_query": {
       const credential = await requireApiKeyCredential(context, input.service);
       url.searchParams.set(input.auth.name, credential.apiKey);
-      return;
+      return credential;
     }
     case "api_key_basic": {
       const credential = await requireApiKeyCredential(context, input.service);
       headers.set("authorization", `Basic ${btoa(`${credential.apiKey}${input.auth.suffix ?? ""}`)}`);
-      return;
+      return credential;
     }
     case "api_key_authorization": {
       const credential = await requireApiKeyCredential(context, input.service);
       headers.set("authorization", `${input.auth.prefix}${credential.apiKey}${input.auth.suffix ?? ""}`);
-      return;
+      return credential;
     }
   }
 }

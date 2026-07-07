@@ -1,7 +1,7 @@
 import type { ActionExecutor, CredentialValidators, ProviderExecutors, ProviderProxyExecutor } from "../core/types.ts";
 
 import { withProviderFallbackMessage } from "./provider-runtime.ts";
-import { generatedProxyExecutors } from "./proxy.generated.ts";
+import { registeredProxyExecutors } from "./proxy.registry.ts";
 import { executorModules } from "./registry.generated.ts";
 
 /**
@@ -52,9 +52,9 @@ export class ProviderLoader implements IProviderLoader {
   }
 
   async loadProxyExecutor(service: string, _providerDisplayName?: string): Promise<ProviderProxyExecutor | undefined> {
-    const generatedProxy = generatedProxyExecutors[service];
-    if (generatedProxy) {
-      return generatedProxy;
+    const registeredProxy = registeredProxyExecutors[service];
+    if (registeredProxy) {
+      return registeredProxy;
     }
 
     const loadExecutors = executorModules[service];

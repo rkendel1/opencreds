@@ -634,6 +634,19 @@ describe("ConnectServer", () => {
     }
   });
 
+  it("documents provider proxy requests in OpenAPI", async () => {
+    const app = createTestServer([apiKeyProvider]).createApp();
+
+    const response = await app.request("/openapi.json");
+    const document = (await response.json()) as { paths: Record<string, unknown> };
+
+    expect(document.paths["/v1/proxy/{service}"]).toMatchObject({
+      post: {
+        summary: "Proxy one provider API request.",
+      },
+    });
+  });
+
   it("rejects non-POST MCP requests", async () => {
     const app = createTestServer([apiKeyProvider]).createApp();
 
