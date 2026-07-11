@@ -29,6 +29,11 @@ interface PubmedActionContext {
   sleep(delayMs: number, signal?: AbortSignal): Promise<void>;
 }
 
+interface PubmedLinkedArticlesResult {
+  sourcePmid: string;
+  articles: PubmedArticle[];
+}
+
 interface NcbiTextRequestOptions {
   source: string;
   maxBytes: number;
@@ -520,7 +525,7 @@ async function fetchLinkedArticles(
   linkName: "pubmed_pubmed_citedin" | "pubmed_pubmed_refs",
   limit: number,
   context: PubmedActionContext,
-): Promise<unknown> {
+): Promise<PubmedLinkedArticlesResult> {
   const payload = requiredRecord(
     await requestPubmedJson(
       "elink.fcgi",
