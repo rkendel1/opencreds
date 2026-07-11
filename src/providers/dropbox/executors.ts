@@ -1,6 +1,5 @@
 import type { CredentialValidators, ProviderExecutors, ProviderProxyExecutor } from "../../core/types.ts";
 import type { OAuthProviderContext } from "../provider-runtime.ts";
-import type { DropboxActionName } from "./actions.ts";
 
 import { Buffer } from "node:buffer";
 import {
@@ -49,7 +48,7 @@ type SharedLinkFileArg = {
   path?: string;
 };
 
-export const dropboxActionHandlers: Record<DropboxActionName, ActionHandler> = {
+export const dropboxActionHandlers: Record<string, ActionHandler> = {
   get_current_account(_input, { accessToken, fetcher }) {
     return getCurrentAccount(accessToken, fetcher);
   },

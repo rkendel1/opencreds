@@ -5,7 +5,6 @@ import type {
   ProviderProxyExecutor,
   ProxyExecutionResult,
 } from "../../core/types.ts";
-import type { ErpnextActionName } from "./actions.ts";
 
 import { compactObject, optionalRecord, optionalString } from "../../core/cast.ts";
 import { assertPublicHttpUrl } from "../../core/request.ts";
@@ -52,7 +51,7 @@ interface ErpnextRequestOptions {
 
 type ErpnextActionHandler = (input: Record<string, unknown>, context: ErpnextActionContext) => Promise<unknown>;
 
-const erpnextActionHandlers: Record<ErpnextActionName, ErpnextActionHandler> = {
+const erpnextActionHandlers: Record<string, ErpnextActionHandler> = {
   async get_logged_user(_input, context) {
     const payload = await requestErpnext({
       ...context,

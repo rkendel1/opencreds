@@ -5,7 +5,6 @@ import type {
   ProxyExecutionResult,
 } from "../../core/types.ts";
 import type { ApiKeyProviderContext } from "../provider-runtime.ts";
-import type { CannyActionName } from "./actions.ts";
 
 import { compactObject, optionalRecord, optionalString, requiredString } from "../../core/cast.ts";
 import {
@@ -25,7 +24,7 @@ const cannyApiBaseUrl = "https://canny.io/api";
 
 type CannyActionHandler = (input: Record<string, unknown>, context: ApiKeyProviderContext) => Promise<unknown>;
 
-export const cannyActionHandlers: Record<CannyActionName, CannyActionHandler> = {
+export const cannyActionHandlers: Record<string, CannyActionHandler> = {
   list_boards(_input, context) {
     return listBoards(context);
   },

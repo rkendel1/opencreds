@@ -4,7 +4,6 @@ import type {
   ProviderExecutors,
   ProviderProxyExecutor,
 } from "../../core/types.ts";
-import type { MixpanelActionName } from "./actions.ts";
 
 import { Buffer } from "node:buffer";
 import {
@@ -62,7 +61,7 @@ interface MixpanelRequestInput {
   notFoundAsInvalidInput?: boolean;
 }
 
-export const mixpanelActionHandlers: Record<MixpanelActionName, MixpanelActionHandler> = {
+export const mixpanelActionHandlers: Record<string, MixpanelActionHandler> = {
   list_saved_cohorts(input, context) {
     return listSavedCohorts(input, context);
   },

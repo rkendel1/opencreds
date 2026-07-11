@@ -395,7 +395,7 @@ export const qqMailActions: readonly QqMailAction[] = [
   folderStatusAction,
   replyEmailAction,
   forwardEmailAction,
-] as const satisfies readonly ProviderActionDefinition[];
+];
 
 export type QqMailActionName = QqMailAction["name"];
 

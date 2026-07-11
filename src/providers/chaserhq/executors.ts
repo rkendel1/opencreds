@@ -7,7 +7,6 @@ import type {
   ProviderProxyExecutor,
   ProxyExecutionResult,
 } from "../../core/types.ts";
-import type { ChaserhqActionName } from "./actions.ts";
 
 import { Buffer } from "node:buffer";
 import { compactObject, optionalNumber, optionalRecord, optionalString, requiredString } from "../../core/cast.ts";
@@ -37,7 +36,7 @@ interface ChaserContext {
 
 type Handler = (input: Record<string, unknown>, context: ChaserContext) => Promise<unknown>;
 
-export const chaserhqActionHandlers: Record<ChaserhqActionName, Handler> = {
+export const chaserhqActionHandlers: Record<string, Handler> = {
   async get_status(_input, context) {
     return { ok: true, raw: await requestChaserJson(context, "/status/") };
   },

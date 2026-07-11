@@ -5,7 +5,6 @@ import type {
   ProviderExecutors,
   ProviderProxyExecutor,
 } from "../../core/types.ts";
-import type { NethuntActionName } from "./actions.ts";
 
 import { Buffer } from "node:buffer";
 import {
@@ -43,7 +42,7 @@ interface NethuntContext {
 
 type NethuntActionHandler = (input: Record<string, unknown>, context: NethuntContext) => Promise<unknown>;
 
-export const nethuntActionHandlers: Record<NethuntActionName, NethuntActionHandler> = {
+export const nethuntActionHandlers: Record<string, NethuntActionHandler> = {
   async list_readable_folders(_input, context): Promise<unknown> {
     return {
       folders: await nethuntGetJson("/triggers/readable-folder", context, "execute"),

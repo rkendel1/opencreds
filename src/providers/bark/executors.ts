@@ -5,7 +5,6 @@ import type {
   ProxyExecutionResult,
 } from "../../core/types.ts";
 import type { ApiKeyProviderContext } from "../provider-runtime.ts";
-import type { BarkActionName } from "./actions.ts";
 
 import { createHash } from "node:crypto";
 import { compactObject, optionalInteger, optionalRecord, optionalString } from "../../core/cast.ts";
@@ -45,7 +44,7 @@ interface BarkResponsePayload {
 type BarkRequestPhase = "validate" | "execute";
 type BarkActionHandler = (input: Record<string, unknown>, context: BarkContext) => Promise<unknown>;
 
-export const barkActionHandlers: Record<BarkActionName, BarkActionHandler> = {
+export const barkActionHandlers: Record<string, BarkActionHandler> = {
   send_notification(input, context) {
     return sendBarkNotification(input, context);
   },

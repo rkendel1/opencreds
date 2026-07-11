@@ -5,7 +5,6 @@ import type {
   ProviderProxyExecutor,
 } from "../../core/types.ts";
 import type { ApiKeyProviderContext } from "../provider-runtime.ts";
-import type { CoinbaseActionName } from "./actions.ts";
 
 import { Buffer } from "node:buffer";
 import { createPrivateKey, createSign, randomBytes } from "node:crypto";
@@ -34,7 +33,7 @@ interface CoinbaseActionContext extends ApiKeyProviderContext {
 }
 type CoinbaseActionHandler = (input: Record<string, unknown>, context: CoinbaseActionContext) => Promise<unknown>;
 
-export const coinbaseActionHandlers: Record<CoinbaseActionName, CoinbaseActionHandler> = {
+export const coinbaseActionHandlers: Record<string, CoinbaseActionHandler> = {
   list_accounts(input, context) {
     return coinbaseGetJson(
       accountsPath,

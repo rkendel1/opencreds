@@ -1,6 +1,5 @@
 import type { CredentialValidationResult } from "../../core/types.ts";
 import type { ApiKeyProviderContext, ProviderFetch, ProviderRuntimeHandler } from "../provider-runtime.ts";
-import type { BenchmarkEmailActionName } from "./actions.ts";
 
 import { compactObject, optionalInteger, optionalRecord, optionalString } from "../../core/cast.ts";
 import { assertPublicHttpUrl } from "../../core/request.ts";
@@ -22,7 +21,7 @@ export interface BenchmarkEmailContext extends ApiKeyProviderContext {
 
 type BenchmarkEmailActionHandler = ProviderRuntimeHandler<BenchmarkEmailContext>;
 
-export const benchmarkEmailActionHandlers: Record<BenchmarkEmailActionName, BenchmarkEmailActionHandler> = {
+export const benchmarkEmailActionHandlers: Record<string, BenchmarkEmailActionHandler> = {
   get_account_summary(_input, context) {
     return requestBenchmarkEmailJson({
       context,
