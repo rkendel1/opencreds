@@ -13,7 +13,7 @@ RUN npm run build --workspace web
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV OOMOL_CONNECT_DATA_DIR=/app/data
 COPY package.json package-lock.json ./
@@ -26,7 +26,7 @@ COPY --from=build /app/dist ./dist
 
 RUN npm ci --omit=dev --ignore-scripts
 VOLUME ["/app/data"]
-EXPOSE 3000
+EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD ["node", "scripts/healthcheck.ts"]
 CMD ["node", "src/server/index.ts"]
