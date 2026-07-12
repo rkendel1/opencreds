@@ -292,6 +292,75 @@ describe("SqliteRuntimeDatabase", () => {
     await expect(withNewKey.runLogStore.list()).resolves.toMatchObject({ items: [{ id: "run-1" }] });
     withNewKey.close();
   });
+
+  it("isolates connections by identity context", async () => {
+    const databasePath = await createDatabasePath();
+    const database = new SqliteRuntimeDatabase(databasePath);
+
+    const userAIdentity = { tenantId: "tenant_1", userId: "user_a" };
+    const userBIdentity = { tenantId: "tenant_1", userId: "user_b" };
+    const noIdentity = undefined;
+
+    // Set connections for different identities with the same service/name
+    await database.connectionStore.set(
+      "github",
+      "work",
+      {
+        authType: "api_key",
+        apiKey: "user-a-token",
+        values: { apiKey: "user-a-token" },
+        profile: { ...githubProfile, displayName: "User A" },
+        metadata: {},
+      },
+      userAIdentity,
+    );
+    await database.connectionStore.set(
+      "github",
+      "work",
+      {
+        authType: "api_key",
+        apiKey: "user-b-token",
+        values: { apiKey: "user-b-token" },
+        profile: { ...githubProfile, displayName: "User B" },
+        metadata: {},
+      },
+      userBIdentity,
+    );
+    await database.connectionStore.set("github", "work", {
+      authType: "api_key",
+      apiKey: "anonymous-token",
+      values: { apiKey: "anonymous-token" },
+      profile: { ...githubProfile, displayName: "Anonymous" },
+      metadata: {},
+    });
+
+    // Each identity sees only their own connection
+    await expect(database.connectionStore.get("github", "work", userAIdentity)).resolves.toMatchObject({
+      apiKey: "user-a-token",
+      profile: { displayName: "User A" },
+    });
+    await expect(database.connectionStore.get("github", "work", userBIdentity)).resolves.toMatchObject({
+      apiKey: "user-b-token",
+      profile: { displayName: "User B" },
+    });
+    await expect(database.connectionStore.get("github", "work", noIdentity)).resolves.toMatchObject({
+      apiKey: "anonymous-token",
+      profile: { displayName: "Anonymous" },
+    });
+
+    // List returns only matching identity's connections
+    await expect(database.connectionStore.list(userAIdentity)).resolves.toHaveLength(1);
+    await expect(database.connectionStore.list(userBIdentity)).resolves.toHaveLength(1);
+    await expect(database.connectionStore.list(noIdentity)).resolves.toHaveLength(1);
+
+    // Delete only affects matching identity
+    await database.connectionStore.delete("github", "work", userAIdentity);
+    await expect(database.connectionStore.get("github", "work", userAIdentity)).resolves.toBeUndefined();
+    await expect(database.connectionStore.get("github", "work", userBIdentity)).resolves.toBeDefined();
+    await expect(database.connectionStore.get("github", "work", noIdentity)).resolves.toBeDefined();
+
+    database.close();
+  });
 });
 
 async function createDatabasePath(): Promise<string> {

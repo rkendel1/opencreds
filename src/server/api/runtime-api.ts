@@ -1,11 +1,21 @@
 import type { RuntimeActionDefinition } from "../../catalog-store.ts";
 import type { ConnectionError, ConnectionSummary } from "../../connection-service.ts";
 import type { ExecutionResult, ProviderDefinition } from "../../core/types.ts";
+import type { IdentityContext } from "../../identity/types.ts";
 import type { Context } from "hono";
 
 type RuntimeStatus = 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 | 501;
 
 export type RuntimeResponseMeta = Record<string, unknown>;
+
+/**
+ * Identity metadata included in API responses when identity context is present.
+ */
+export interface RuntimeIdentityMeta {
+  tenant?: string;
+  user?: string;
+  workspace?: string;
+}
 
 export interface RuntimeSuccessEnvelope<TData> {
   success: true;
@@ -195,4 +205,46 @@ function mapExecutionErrorStatus(code: string | undefined): 400 | 403 | 404 | 42
     return 500;
   }
   return 400;
+}
+
+/**
+ * Create identity metadata for API responses.
+ *
+ * Returns undefined if identity context is empty (single-user mode).
+ */
+export function createIdentityMeta(identity: IdentityContext | undefined): RuntimeIdentityMeta | undefined {
+  if (!identity) {
+    return undefined;
+  }
+
+  const hasIdentity = identity.tenantId || identity.userId || identity.workspaceId;
+  if (!hasIdentity) {
+    return undefined;
+  }
+
+  const meta: RuntimeIdentityMeta = {};
+  if (identity.tenantId) {
+    meta.tenant = identity.tenantId;
+  }
+  if (identity.userId) {
+    meta.user = identity.userId;
+  }
+  if (identity.workspaceId) {
+    meta.workspace = identity.workspaceId;
+  }
+  return meta;
+}
+
+/**
+ * Merge identity metadata into response meta if present.
+ */
+export function mergeIdentityIntoMeta(
+  meta: RuntimeResponseMeta,
+  identity: IdentityContext | undefined,
+): RuntimeResponseMeta {
+  const identityMeta = createIdentityMeta(identity);
+  if (!identityMeta) {
+    return meta;
+  }
+  return { ...meta, identity: identityMeta };
 }
