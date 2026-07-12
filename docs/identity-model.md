@@ -43,11 +43,13 @@ Tenant (currently: enforced isolation)
 ```
 
 **Current Implementation**:
+
 - Tenant + User isolation is **enforced** in storage queries
 - Workspace ID is **stored** but not used for isolation
 - User credentials override tenant defaults
 
 **Future Enhancement**:
+
 - Workspace-level isolation (would require schema changes)
 - Workspace overrides user preferences
 
@@ -95,7 +97,12 @@ All storage interfaces accept an optional `IdentityContext` parameter:
 ```typescript
 interface IConnectionStore {
   get(service: string, connectionName: string, identity?: IdentityContext): Promise<ResolvedCredential | undefined>;
-  set(service: string, connectionName: string, credential: ResolvedCredential, identity?: IdentityContext): Promise<void>;
+  set(
+    service: string,
+    connectionName: string,
+    credential: ResolvedCredential,
+    identity?: IdentityContext,
+  ): Promise<void>;
   delete(service: string, connectionName: string, identity?: IdentityContext): Promise<void>;
   list(identity?: IdentityContext): Promise<StoredConnection[]>;
 }
@@ -202,11 +209,13 @@ Deletion operations are scoped to identity:
 ### Adding Identity to API Calls
 
 Before (legacy):
+
 ```typescript
 await connections.getCredential("github", "default");
 ```
 
 After (identity-aware):
+
 ```typescript
 const identity = { tenantId: "org-123", userId: "user-456" };
 await connections.getCredential("github", "default", identity);
