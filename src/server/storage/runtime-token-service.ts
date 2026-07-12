@@ -43,6 +43,7 @@ export interface IRuntimeTokenStore {
 }
 
 const tokenPrefix = "oct_";
+const serviceTokenPrefix = "ocs_";
 
 export class RuntimeTokenService {
   private readonly store: IRuntimeTokenStore;
@@ -52,7 +53,19 @@ export class RuntimeTokenService {
   }
 
   async createToken(name: string, identity?: IdentityContext): Promise<RuntimeTokenCreation> {
-    const token = `${tokenPrefix}${randomBytes(32).toString("base64url")}`;
+    return this.createTokenWithPrefix(name, tokenPrefix, identity);
+  }
+
+  async createServiceToken(name: string, identity?: IdentityContext): Promise<RuntimeTokenCreation> {
+    return this.createTokenWithPrefix(name, serviceTokenPrefix, identity);
+  }
+
+  private async createTokenWithPrefix(
+    name: string,
+    prefix: string,
+    identity?: IdentityContext,
+  ): Promise<RuntimeTokenCreation> {
+    const token = `${prefix}${randomBytes(32).toString("base64url")}`;
     const now = new Date().toISOString();
     const record: RuntimeTokenRecord = {
       id: randomUUID(),

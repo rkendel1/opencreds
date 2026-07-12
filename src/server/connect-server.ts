@@ -1,3 +1,4 @@
+import type { IAuthProvider } from "../auth/auth-provider.ts";
 import type { CatalogStore, RuntimeActionDefinition } from "../catalog-store.ts";
 import type { ConnectionService } from "../connection-service.ts";
 import type { ActionPolicyService } from "../core/action-policy.ts";
@@ -37,6 +38,7 @@ import {
   writeRuntimeSuccess,
 } from "./api/runtime-api.ts";
 import { createTransitFileResponse, TransitFileError } from "./files/transit-file-store.ts";
+import { createAuthenticationMiddleware, readIdentityContext } from "./middleware/authentication.ts";
 import { ProxyRunner } from "./proxy/proxy-runner.ts";
 import { decodeRunLogCursor } from "./storage/runtime-store.ts";
 
@@ -54,6 +56,7 @@ export interface IConnectServerOptions {
   transitFiles: ITransitFileService;
   staticRoot?: string;
   auth?: LocalAuthOptions;
+  authProvider?: IAuthProvider;
   actionPolicy?: ActionPolicyService;
   actionSearch?: ActionSearchIndexProvider;
   registerStaticRoutes?: (app: Hono) => void;
@@ -100,6 +103,15 @@ export class ConnectServer {
     });
     app.get("/health", (context) => context.json({ ok: true }));
     app.use("*", createLocalAuthMiddleware(auth));
+    if (this.options.authProvider) {
+      app.use(
+        "*",
+        createAuthenticationMiddleware({
+          provider: this.options.authProvider,
+          shouldAuthenticate: (context) => shouldAuthenticateRequest(context.req.path, context.req.method),
+        }),
+      );
+    }
     app.get("/v1/health", (context) => writeRuntimeSuccess(context, { ok: true, runtime: "oomol-connect" }));
     app.get("/v1/providers", (context) => this.listRuntimeProviders(context));
     app.get("/v1/actions", (context) => this.listRuntimeActions(context));
@@ -163,6 +175,7 @@ export class ConnectServer {
     app.get("/api/runtime-tokens", (context) => this.listRuntimeTokens(context));
     app.post("/api/runtime-tokens", (context) => this.createRuntimeToken(context));
     app.delete("/api/runtime-tokens/:id", (context) => this.revokeRuntimeToken(context, context.req.param("id")));
+    app.post("/api/service-tokens", (context) => this.createServiceToken(context));
     app.get("/api/oauth/configs", (context) => this.listOAuthConfigs(context));
     app.put("/api/oauth/configs/:service", (context) => this.upsertOAuthConfig(context, context.req.param("service")));
     app.delete("/api/oauth/configs/:service", (context) =>
@@ -273,6 +286,7 @@ export class ConnectServer {
     const index = await this.actionSearch.get();
     return context.json(
       await this.serializeSearchResults(
+        context,
         searchActions(index, query.q, {
           service: query.service,
           limit: query.limit,
@@ -345,12 +359,18 @@ export class ConnectServer {
       service: query.service,
       limit: query.limit,
     });
-    return writeRuntimeSuccess(context, await this.serializeSearchResults(results));
+    return writeRuntimeSuccess(context, await this.serializeSearchResults(context, results));
   }
 
-  private async serializeSearchResults(results: ActionSearchResult[]): Promise<RuntimeActionSearchResult[]> {
+  private async serializeSearchResults(
+    context: Context,
+    results: ActionSearchResult[],
+  ): Promise<RuntimeActionSearchResult[]> {
     const authenticated = new Set(
-      await this.options.connections.listAuthenticatedServices([...new Set(results.map((result) => result.service))]),
+      await this.options.connections.listAuthenticatedServices(
+        [...new Set(results.map((result) => result.service))],
+        readIdentityContext(context),
+      ),
     );
     return results.flatMap((result) => {
       const action = this.options.catalog.actionsById.get(result.id);
@@ -392,6 +412,7 @@ export class ConnectServer {
         input: body.input ?? {},
         caller: "http",
         connectionName: readConnectionName(context, body),
+        identity: readIdentityContext(context),
       });
       if (!run) {
         return writeRuntimeFailure(context, {
@@ -438,6 +459,7 @@ export class ConnectServer {
       service,
       input: body,
       connectionName: readConnectionName(context, body),
+      identity: readIdentityContext(context),
     });
     if (result.ok) {
       return writeRuntimeSuccess(context, result.response);
@@ -455,7 +477,7 @@ export class ConnectServer {
   private async listRuntimeApps(context: Context): Promise<Response> {
     return writeRuntimeSuccess(
       context,
-      (await this.options.connections.listConnections()).map(serializeRuntimeConnectedApp),
+      (await this.options.connections.listConnections(readIdentityContext(context))).map(serializeRuntimeConnectedApp),
     );
   }
 
@@ -463,7 +485,9 @@ export class ConnectServer {
     try {
       return writeRuntimeSuccess(
         context,
-        (await this.options.connections.listConnectionsByService(service)).map(serializeRuntimeConnectedApp),
+        (await this.options.connections.listConnectionsByService(service, readIdentityContext(context))).map(
+          serializeRuntimeConnectedApp,
+        ),
       );
     } catch (error) {
       if (error instanceof ConnectionError) {
@@ -481,7 +505,10 @@ export class ConnectServer {
 
   private async listAuthenticatedRuntimeApps(context: Context): Promise<Response> {
     const services = context.req.queries("service") ?? [];
-    return writeRuntimeSuccess(context, await this.options.connections.listAuthenticatedServices(services));
+    return writeRuntimeSuccess(
+      context,
+      await this.options.connections.listAuthenticatedServices(services, readIdentityContext(context)),
+    );
   }
 
   private async handleMcp(context: Context): Promise<Response> {
@@ -521,7 +548,7 @@ export class ConnectServer {
   }
 
   private async listConnections(context: Context): Promise<Response> {
-    return context.json(await this.options.connections.listConnections());
+    return context.json(await this.options.connections.listConnections(readIdentityContext(context)));
   }
 
   private async upsertConnection(context: Context, service: string): Promise<Response> {
@@ -552,7 +579,10 @@ export class ConnectServer {
       this.options.logger?.info(logContext, "connection started");
       return this.writeConnectionResult(
         context,
-        this.options.connections.connectWithoutAuth(service, { connectionName }),
+        this.options.connections.connectWithoutAuth(service, {
+          connectionName,
+          identity: readIdentityContext(context),
+        }),
         logContext,
       );
     }
@@ -560,7 +590,11 @@ export class ConnectServer {
       this.options.logger?.info(logContext, "connection started");
       return this.writeConnectionResult(
         context,
-        this.options.connections.connectWithApiKey(service, { values, connectionName }),
+        this.options.connections.connectWithApiKey(service, {
+          values,
+          connectionName,
+          identity: readIdentityContext(context),
+        }),
         logContext,
       );
     }
@@ -568,7 +602,11 @@ export class ConnectServer {
       this.options.logger?.info(logContext, "connection started");
       return this.writeConnectionResult(
         context,
-        this.options.connections.connectWithCustomCredential(service, { values, connectionName }),
+        this.options.connections.connectWithCustomCredential(service, {
+          values,
+          connectionName,
+          identity: readIdentityContext(context),
+        }),
         logContext,
       );
     }
@@ -595,7 +633,7 @@ export class ConnectServer {
     this.options.logger?.info(logContext, "connection disconnect started");
     return this.writeConnectionResult(
       context,
-      this.options.connections.disconnect(service, connectionName),
+      this.options.connections.disconnect(service, connectionName, readIdentityContext(context)),
       logContext,
     );
   }
@@ -617,7 +655,11 @@ export class ConnectServer {
       };
       this.options.logger?.info(logContext, "oauth authorization started");
 
-      const authorization = await this.options.oauthFlow.startAuthorization({ service, connectionName });
+      const authorization = await this.options.oauthFlow.startAuthorization({
+        service,
+        connectionName,
+        identity: readIdentityContext(context),
+      });
       const authorizationUrl = new URL(authorization.authorizationUrl);
       this.options.logger?.info(
         {
@@ -647,7 +689,7 @@ export class ConnectServer {
   }
 
   private async listRuntimeTokens(context: Context): Promise<Response> {
-    return context.json(await this.options.runtimeTokens.listTokens());
+    return context.json(await this.options.runtimeTokens.listTokens(readIdentityContext(context)));
   }
 
   private async createRuntimeToken(context: Context): Promise<Response> {
@@ -657,7 +699,24 @@ export class ConnectServer {
       return jsonError(context, 400, "invalid_input", "name is required.");
     }
 
-    const created = await this.options.runtimeTokens.createToken(name);
+    const created = await this.options.runtimeTokens.createToken(name, readIdentityContext(context));
+    return context.json({
+      token: created.token,
+      record: {
+        id: created.record.id,
+        name: created.record.name,
+        createdAt: created.record.createdAt,
+      },
+    });
+  }
+
+  private async createServiceToken(context: Context): Promise<Response> {
+    const body = await readJsonBody(context);
+    const name = optionalString(body.name);
+    if (!name) {
+      return jsonError(context, 400, "invalid_input", "name is required.");
+    }
+    const created = await this.options.runtimeTokens.createServiceToken(name, readIdentityContext(context));
     return context.json({
       token: created.token,
       record: {
@@ -669,7 +728,7 @@ export class ConnectServer {
   }
 
   private async revokeRuntimeToken(context: Context, id: string): Promise<Response> {
-    if (!(await this.options.runtimeTokens.revokeToken(id))) {
+    if (!(await this.options.runtimeTokens.revokeToken(id, readIdentityContext(context)))) {
       return jsonError(context, 404, "runtime_token_not_found", `Runtime token not found: ${id}.`);
     }
 
@@ -809,6 +868,17 @@ function readConnectionName(context: Context, body?: Record<string, unknown>): s
     optionalString(context.req.header("x-oo-connector-alias")) ??
     optionalString(context.req.query("connectionName")) ??
     optionalString(context.req.query("alias"))
+  );
+}
+
+function shouldAuthenticateRequest(path: string, method: string): boolean {
+  return !(
+    path === "/health" ||
+    path === "/oauth/callback" ||
+    path.startsWith("/oauth/callback/") ||
+    (method === "GET" && path === "/api/auth/session") ||
+    (method === "POST" && path === "/api/auth/logout") ||
+    (method === "GET" && path.startsWith("/api/files/"))
   );
 }
 

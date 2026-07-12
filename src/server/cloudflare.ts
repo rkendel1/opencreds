@@ -50,6 +50,7 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
   }
 
   const secretCodec = await createSecretCodec(env.OOMOL_CONNECT_ENCRYPTION_KEY);
+  const authMode = readAuthMode(env.OPENCREDS_AUTH_MODE);
   return await createConnectApp({
     catalog: await loadCatalogOnce(assets),
     providerLoader: new ProviderLoader(),
@@ -64,6 +65,12 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
     secretCodec,
     adminToken: env.OOMOL_CONNECT_ADMIN_TOKEN,
     runtimeToken: env.OOMOL_CONNECT_RUNTIME_TOKEN,
+    authMode,
+    jwtSecret: env.OPENCREDS_JWT_SECRET,
+    jwtIssuer: env.OPENCREDS_JWT_ISSUER,
+    jwtAudience: env.OPENCREDS_JWT_AUDIENCE,
+    trustedProxy: env.OPENCREDS_TRUSTED_PROXY === "true",
+    anonymousAuthEnabled: authMode === "anonymous" || authMode === "hybrid",
     actionPolicy: new ActionPolicyService({
       allowedActions: parseActionPolicyList(env.OOMOL_CONNECT_ALLOWED_ACTIONS),
       blockedActions: parseActionPolicyList(env.OOMOL_CONNECT_BLOCKED_ACTIONS),
@@ -113,6 +120,10 @@ function createCacheKey(env: CloudflareEnv, publicOrigin: string): string {
     publicOrigin,
     adminToken: env.OOMOL_CONNECT_ADMIN_TOKEN ?? "",
     runtimeToken: env.OOMOL_CONNECT_RUNTIME_TOKEN ?? "",
+    authMode: env.OPENCREDS_AUTH_MODE ?? "",
+    jwtIssuer: env.OPENCREDS_JWT_ISSUER ?? "",
+    jwtAudience: env.OPENCREDS_JWT_AUDIENCE ?? "",
+    trustedProxy: env.OPENCREDS_TRUSTED_PROXY ?? "",
     encryptionKey: env.OOMOL_CONNECT_ENCRYPTION_KEY ?? "",
     allowedActions: env.OOMOL_CONNECT_ALLOWED_ACTIONS ?? "",
     blockedActions: env.OOMOL_CONNECT_BLOCKED_ACTIONS ?? "",
@@ -126,4 +137,17 @@ function createCacheKey(env: CloudflareEnv, publicOrigin: string): string {
 function shouldServeAsset(request: Request): boolean {
   const { pathname } = new URL(request.url);
   return !pathname.startsWith("/catalog") && isConsoleShellPath(pathname);
+}
+
+function readAuthMode(value: string | undefined): "anonymous" | "runtime-token" | "jwt" | "proxy" | "hybrid" {
+  if (
+    value === "anonymous" ||
+    value === "runtime-token" ||
+    value === "jwt" ||
+    value === "proxy" ||
+    value === "hybrid"
+  ) {
+    return value;
+  }
+  return "anonymous";
 }
