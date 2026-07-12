@@ -24,7 +24,7 @@ export class AnonymousAuthProvider implements IAuthProvider {
       type: "user",
       roles: ["anonymous"],
       issuedAt: now,
-      expiresAt: Number.MAX_SAFE_INTEGER,
+      expiresAt: Date.UTC(9999, 0, 1),
     };
   }
 }

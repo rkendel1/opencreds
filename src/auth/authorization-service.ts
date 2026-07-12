@@ -27,7 +27,7 @@ export class AuthorizationService {
   }
 
   private hasPermissionRole(principal: Principal, permission: string): boolean {
-    return principal.roles.includes("*") || principal.roles.includes(permission) || principal.roles.length === 0;
+    return principal.roles.includes("*") || principal.roles.includes(permission);
   }
 
   private withinPrincipalIdentity(request: AuthorizationRequest): boolean {

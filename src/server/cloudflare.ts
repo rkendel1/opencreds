@@ -5,6 +5,7 @@ import type { ConnectApp } from "./connect-app.ts";
 import type { Logger } from "./logger.ts";
 import type { ISecretCodec } from "./secrets/secret-codec-core.ts";
 
+import { readAuthMode } from "../auth/auth-mode.ts";
 import { ActionPolicyService, parseActionPolicyList } from "../core/action-policy.ts";
 import { ProviderLoader } from "../providers/provider-loader.ts";
 import { executableActionIds } from "../providers/registry.generated.ts";
@@ -50,7 +51,7 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
   }
 
   const secretCodec = await createSecretCodec(env.OOMOL_CONNECT_ENCRYPTION_KEY);
-  const authMode = readAuthMode(env.OPENCREDS_AUTH_MODE);
+  const authMode = readAuthMode(env.OPENCREDS_AUTH_MODE, "anonymous");
   return await createConnectApp({
     catalog: await loadCatalogOnce(assets),
     providerLoader: new ProviderLoader(),
@@ -137,17 +138,4 @@ function createCacheKey(env: CloudflareEnv, publicOrigin: string): string {
 function shouldServeAsset(request: Request): boolean {
   const { pathname } = new URL(request.url);
   return !pathname.startsWith("/catalog") && isConsoleShellPath(pathname);
-}
-
-function readAuthMode(value: string | undefined): "anonymous" | "runtime-token" | "jwt" | "proxy" | "hybrid" {
-  if (
-    value === "anonymous" ||
-    value === "runtime-token" ||
-    value === "jwt" ||
-    value === "proxy" ||
-    value === "hybrid"
-  ) {
-    return value;
-  }
-  return "anonymous";
 }

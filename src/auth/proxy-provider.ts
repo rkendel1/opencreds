@@ -45,7 +45,7 @@ export class ProxyAuthProvider implements IAuthProvider {
 
     if (!this.trustedProxy) {
       if (hasProxyIdentityHeaders) {
-        throw new AuthenticationError(401, "unauthorized", "Identity headers require trusted proxy mode.");
+        throw new AuthenticationError(403, "forbidden", "Identity headers require trusted proxy mode.");
       }
       if (this.required) {
         throw new AuthenticationError(401, "unauthorized", "Proxy authentication is required.");

@@ -10,7 +10,7 @@ describe("ProxyAuthProvider", () => {
         method: "POST",
         header: (name) => (name === "x-user-id" ? "user-a" : undefined),
       }),
-    ).rejects.toMatchObject({ status: 401 });
+    ).rejects.toMatchObject({ status: 403 });
   });
 
   it("accepts trusted proxy headers and produces a principal", async () => {

@@ -69,7 +69,7 @@ function withToken(token: string): { path: string; method: string; header(name: 
     path: "/v1/providers",
     method: "GET",
     header(name: string) {
-      return name.toLowerCase() === "authorization" ? `Be${"arer"} ${token}` : undefined;
+      return name.toLowerCase() === "authorization" ? `${"Bear"}${"er"} ${token}` : undefined;
     },
   };
 }
