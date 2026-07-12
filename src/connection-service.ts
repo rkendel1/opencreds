@@ -38,10 +38,14 @@ export interface ConnectionSummary {
 export interface ConnectWithCredentialInput {
   connectionName?: string;
   values?: Record<string, unknown>;
+  /** Identity context for the connection owner. */
+  identity?: IdentityContext;
 }
 
 export interface ConnectWithoutAuthInput {
   connectionName?: string;
+  /** Identity context for the connection owner. */
+  identity?: IdentityContext;
 }
 
 export interface ConnectionServiceOptions {
@@ -131,8 +135,14 @@ export class ConnectionService {
     this.logger = input.logger;
   }
 
-  async listConnections(): Promise<ConnectionSummary[]> {
-    const configured = await this.store.list();
+  /**
+   * List all connections, optionally filtered by identity.
+   *
+   * When identity is provided, only connections owned by that identity are returned.
+   * For backward compatibility, omitting identity returns all connections (legacy mode).
+   */
+  async listConnections(identity?: IdentityContext): Promise<ConnectionSummary[]> {
+    const configured = await this.store.list(identity);
     const configuredByService = new Map<string, ServiceConnection[]>();
     for (const connection of configured) {
       const serviceConnections = configuredByService.get(connection.service) ?? [];
@@ -157,9 +167,12 @@ export class ConnectionService {
     });
   }
 
-  async listConnectionsByService(service: string): Promise<ConnectionSummary[]> {
+  /**
+   * List connections for a specific service, optionally filtered by identity.
+   */
+  async listConnectionsByService(service: string, identity?: IdentityContext): Promise<ConnectionSummary[]> {
     const provider = this.getProvider(service);
-    const connections = (await this.store.list()).filter((connection) => connection.service === service);
+    const connections = (await this.store.list(identity)).filter((connection) => connection.service === service);
     if (connections.length > 0) {
       return connections.map((connection) =>
         this.createConfiguredConnectionSummary(provider, connection.connectionName, connection.credential),
@@ -171,8 +184,11 @@ export class ConnectionService {
       : [];
   }
 
-  async listAuthenticatedServices(services: string[]): Promise<string[]> {
-    const configured = await this.store.list();
+  /**
+   * List services that have authenticated connections for the given identity.
+   */
+  async listAuthenticatedServices(services: string[], identity?: IdentityContext): Promise<string[]> {
+    const configured = await this.store.list(identity);
     const authenticated = new Set(
       configured
         .filter((connection) => connection.credential.authType !== "no_auth")
@@ -181,10 +197,19 @@ export class ConnectionService {
     return services.filter((service) => authenticated.has(service));
   }
 
-  async getConnectionSummary(service: string, connectionName?: string): Promise<ConnectionSummary | undefined> {
+  /**
+   * Get connection summary for a specific service and connection name.
+   *
+   * When identity is provided, only connections owned by that identity are accessible.
+   */
+  async getConnectionSummary(
+    service: string,
+    connectionName?: string,
+    identity?: IdentityContext,
+  ): Promise<ConnectionSummary | undefined> {
     const provider = this.getProvider(service);
     const name = normalizeConnectionName(connectionName);
-    const stored = await this.store.get(service, name);
+    const stored = await this.store.get(service, name, identity);
     if (!stored && connectionName && !this.supportsAuth(provider, "no_auth")) {
       throw new ConnectionError("connection_not_found", `${service} connection not found: ${name}.`);
     }
@@ -196,12 +221,21 @@ export class ConnectionService {
         : undefined;
   }
 
-  async getCredential(service: string, connectionName?: string): Promise<ResolvedCredential | undefined> {
+  /**
+   * Get credential for a specific service and connection name.
+   *
+   * When identity is provided, only credentials owned by that identity are accessible.
+   */
+  async getCredential(
+    service: string,
+    connectionName?: string,
+    identity?: IdentityContext,
+  ): Promise<ResolvedCredential | undefined> {
     const provider = this.getProvider(service);
     const name = normalizeConnectionName(connectionName);
-    const stored = await this.store.get(service, name);
+    const stored = await this.store.get(service, name, identity);
     if (stored) {
-      return stored.authType === "oauth2" ? await this.resolveOAuthCredential(service, name, stored) : stored;
+      return stored.authType === "oauth2" ? await this.resolveOAuthCredential(service, name, stored, identity) : stored;
     }
 
     if (connectionName && !this.supportsAuth(provider, "no_auth")) {
@@ -211,9 +245,12 @@ export class ConnectionService {
     return this.supportsAuth(provider, "no_auth") ? { authType: "no_auth" } : undefined;
   }
 
-  forConnection(connectionName?: string): Pick<ConnectionService, "getCredential"> {
+  /**
+   * Create a bound credential resolver for a specific connection and identity.
+   */
+  forConnection(connectionName?: string, identity?: IdentityContext): Pick<ConnectionService, "getCredential"> {
     return {
-      getCredential: (service: string) => this.getCredential(service, connectionName),
+      getCredential: (service: string) => this.getCredential(service, connectionName, identity),
     };
   }
 
@@ -253,7 +290,7 @@ export class ConnectionService {
       ),
     };
     const connectionName = normalizeConnectionName(input.connectionName);
-    await this.store.set(service, connectionName, credential);
+    await this.store.set(service, connectionName, credential, input.identity);
 
     return this.createStoredConnectionSummary(provider, connectionName, credential);
   }
@@ -282,15 +319,21 @@ export class ConnectionService {
       ),
     };
     const connectionName = normalizeConnectionName(input.connectionName);
-    await this.store.set(service, connectionName, credential);
+    await this.store.set(service, connectionName, credential, input.identity);
 
     return this.createStoredConnectionSummary(provider, connectionName, credential);
   }
 
+  /**
+   * Store an OAuth credential for a service.
+   *
+   * When identity is provided, the credential is stored under that identity.
+   */
   async setOAuthCredential(
     service: string,
     credential: Extract<ResolvedCredential, { authType: "oauth2" }>,
     connectionNameInput?: string,
+    identity?: IdentityContext,
   ): Promise<ConnectionSummary> {
     const provider = this.getProvider(service);
     if (!this.supportsAuth(provider, "oauth2")) {
@@ -310,16 +353,22 @@ export class ConnectionService {
       ...credential,
       ...this.mergeCredentialRuntimeData(provider, "oauth2", credential, validation),
     };
-    await this.store.set(service, connectionName, storedCredential);
+    await this.store.set(service, connectionName, storedCredential, identity);
     return this.createStoredConnectionSummary(provider, connectionName, storedCredential);
   }
 
+  /**
+   * Disconnect a service by removing its credentials.
+   *
+   * When identity is provided, only the connection owned by that identity is removed.
+   */
   async disconnect(
     service: string,
     connectionNameInput?: string,
+    identity?: IdentityContext,
   ): Promise<ConnectionSummary | DisconnectedConnectionSummary> {
     const connectionName = normalizeConnectionName(connectionNameInput);
-    await this.store.delete(service, connectionName);
+    await this.store.delete(service, connectionName, identity);
     const provider = this.catalog.providers.find((provider) => provider.service === service);
     if (provider && this.supportsAuth(provider, "no_auth")) {
       return this.connectWithoutAuth(service, { connectionName });
@@ -436,6 +485,7 @@ export class ConnectionService {
     service: string,
     connectionName: string,
     credential: Extract<ResolvedCredential, { authType: "oauth2" }>,
+    identity?: IdentityContext,
   ): Promise<Extract<ResolvedCredential, { authType: "oauth2" }>> {
     if (!isOAuthCredentialExpired(credential)) {
       return credential;
@@ -456,7 +506,7 @@ export class ConnectionService {
     }
 
     const nextCredential = await this.oauthCredentials.refresh(service, credential);
-    await this.store.set(service, connectionName, nextCredential);
+    await this.store.set(service, connectionName, nextCredential, identity);
     return nextCredential;
   }
 

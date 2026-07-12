@@ -2,6 +2,7 @@ import type { CatalogStore } from "../../catalog-store.ts";
 import type { ConnectionService } from "../../connection-service.ts";
 import type { ActionPolicyService } from "../../core/action-policy.ts";
 import type { ExecutionContext, ExecutionResult, TransitFileWriter } from "../../core/types.ts";
+import type { IdentityContext } from "../../identity/types.ts";
 import type { IProviderLoader } from "../../providers/provider-loader.ts";
 import type { Logger } from "../logger.ts";
 import type { IRunLogStore, RunLogListInput, RunLogPage, RunLogCaller } from "../storage/runtime-store.ts";
@@ -24,6 +25,8 @@ export interface RunActionInput {
   input: unknown;
   caller: RunLogCaller;
   connectionName?: string;
+  /** Identity context for credential resolution and audit logging. */
+  identity?: IdentityContext;
 }
 
 export interface ActionRunResult {
@@ -33,6 +36,9 @@ export interface ActionRunResult {
 
 /**
  * Shared execution boundary for HTTP, MCP, and future local callers.
+ *
+ * When identity is provided in the run input, credentials are resolved under that
+ * identity context. This enforces tenant/user isolation for multi-user deployments.
  */
 export class ActionRunner {
   private readonly options: ActionRunnerOptions;
@@ -61,9 +67,16 @@ export class ActionRunner {
       service: action.service,
       caller: input.caller,
       connectionName: input.connectionName,
+      tenantId: input.identity?.tenantId,
+      userId: input.identity?.userId,
+      workspaceId: input.identity?.workspaceId,
     };
     this.options.logger?.info(logContext, "action run started");
-    const connection = await this.options.connections.getConnectionSummary(action.service, input.connectionName);
+    const connection = await this.options.connections.getConnectionSummary(
+      action.service,
+      input.connectionName,
+      input.identity,
+    );
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
     const executor = action.execution.locallyExecutable
@@ -77,7 +90,7 @@ export class ActionRunner {
       action,
       executor,
       input.input,
-      this.createExecutionContext(input.connectionName),
+      this.createExecutionContext(input.connectionName, input.identity),
       this.options.actionPolicy,
     );
     const completedAtMs = Date.now();
@@ -118,9 +131,9 @@ export class ActionRunner {
     return this.options.runs.list(input);
   }
 
-  private createExecutionContext(connectionName: string | undefined): ExecutionContext {
+  private createExecutionContext(connectionName: string | undefined, identity?: IdentityContext): ExecutionContext {
     const context: ExecutionContext = {
-      ...this.options.connections.forConnection(connectionName),
+      ...this.options.connections.forConnection(connectionName, identity),
     };
     if (this.options.transitFiles) {
       context.transitFiles = this.options.transitFiles;

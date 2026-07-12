@@ -1,4 +1,5 @@
 import type { ConnectionService } from "../connection-service.ts";
+import type { IdentityContext } from "../identity/types.ts";
 import type { OAuthClientConfigService } from "./oauth-client-config-service.ts";
 
 import { createHash, randomBytes } from "node:crypto";
@@ -15,6 +16,8 @@ export type OAuthAuthorizationStart = {
 export interface OAuthAuthorizationStartInput {
   service: string;
   connectionName?: string;
+  /** Identity context to preserve through the OAuth flow. */
+  identity?: IdentityContext;
 }
 
 export interface OAuthAuthorizationCompleteInput {
@@ -24,6 +27,9 @@ export interface OAuthAuthorizationCompleteInput {
 
 /**
  * Short-lived OAuth state stored while the browser completes authorization.
+ *
+ * The identity context is persisted with the state so that on callback the
+ * resulting credential is stored under the correct owner.
  */
 export type OAuthAuthorizationState = {
   service: string;
@@ -31,6 +37,8 @@ export type OAuthAuthorizationState = {
   state: string;
   createdAt: string;
   pkceCodeVerifier?: string;
+  /** Identity context of the user initiating the OAuth flow. */
+  identity?: IdentityContext;
 };
 
 /**
@@ -63,7 +71,7 @@ export class OAuthFlowService {
   }
 
   async startAuthorization(input: OAuthAuthorizationStartInput): Promise<OAuthAuthorizationStart> {
-    const { service, connectionName } = input;
+    const { service, connectionName, identity } = input;
     const auth = this.clientConfigs.getOAuthDefinition(service);
     const config = await this.clientConfigs.getConfig(service);
     if (!config) {
@@ -78,6 +86,7 @@ export class OAuthFlowService {
       state,
       createdAt: new Date().toISOString(),
       pkceCodeVerifier,
+      identity,
     });
 
     const authorizationUrl = new URL(this.clientConfigs.resolveEndpointUrl(service, auth.authorizationUrl, config));
@@ -151,7 +160,12 @@ export class OAuthFlowService {
       },
     };
 
-    await this.connections.setOAuthCredential(pending.service, oauthCredential, pending.connectionName);
+    await this.connections.setOAuthCredential(
+      pending.service,
+      oauthCredential,
+      pending.connectionName,
+      pending.identity,
+    );
     return {
       service: pending.service,
       connected: true,
