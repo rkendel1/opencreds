@@ -170,7 +170,7 @@ describe("ProxyRunner", () => {
         getCredential: expect.any(Function),
       }),
     );
-    expect(connections.forConnection).toHaveBeenCalledWith("work");
+    expect(connections.forConnection).toHaveBeenCalledWith("work", undefined);
   });
 
   it("passes HEAD requests through to provider proxy executors", async () => {

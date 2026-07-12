@@ -2,6 +2,7 @@ import type { CatalogStore } from "../../catalog-store.ts";
 import type { ConnectionService } from "../../connection-service.ts";
 import type { ActionPolicyService } from "../../core/action-policy.ts";
 import type { ProxyRequestInput, ProxyResponse } from "../../core/types.ts";
+import type { IdentityContext } from "../../identity/types.ts";
 import type { IProviderLoader } from "../../providers/provider-loader.ts";
 import type { Logger } from "../logger.ts";
 
@@ -23,6 +24,7 @@ export interface RunProxyInput {
   service: string;
   input: unknown;
   connectionName?: string;
+  identity?: IdentityContext;
 }
 
 export type ProxyRunResult =
@@ -102,9 +104,9 @@ export class ProxyRunner {
     this.options.logger?.info(logContext, "proxy request started");
     const startedAtMs = Date.now();
     try {
-      await this.options.connections.getConnectionSummary(provider.service, input.connectionName);
+      await this.options.connections.getConnectionSummary(provider.service, input.connectionName, input.identity);
       const result = await executor(request.input, {
-        ...this.options.connections.forConnection(input.connectionName),
+        ...this.options.connections.forConnection(input.connectionName, input.identity),
       });
       const durationMs = Date.now() - startedAtMs;
       if (result.ok) {

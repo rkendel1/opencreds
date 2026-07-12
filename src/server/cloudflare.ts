@@ -5,6 +5,7 @@ import type { ConnectApp } from "./connect-app.ts";
 import type { Logger } from "./logger.ts";
 import type { ISecretCodec } from "./secrets/secret-codec-core.ts";
 
+import { readAuthMode } from "../auth/auth-mode.ts";
 import { ActionPolicyService, parseActionPolicyList } from "../core/action-policy.ts";
 import { ProviderLoader } from "../providers/provider-loader.ts";
 import { executableActionIds } from "../providers/registry.generated.ts";
@@ -50,6 +51,7 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
   }
 
   const secretCodec = await createSecretCodec(env.OOMOL_CONNECT_ENCRYPTION_KEY);
+  const authMode = readAuthMode(env.OPENCREDS_AUTH_MODE, "anonymous");
   return await createConnectApp({
     catalog: await loadCatalogOnce(assets),
     providerLoader: new ProviderLoader(),
@@ -64,6 +66,12 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
     secretCodec,
     adminToken: env.OOMOL_CONNECT_ADMIN_TOKEN,
     runtimeToken: env.OOMOL_CONNECT_RUNTIME_TOKEN,
+    authMode,
+    jwtSecret: env.OPENCREDS_JWT_SECRET,
+    jwtIssuer: env.OPENCREDS_JWT_ISSUER,
+    jwtAudience: env.OPENCREDS_JWT_AUDIENCE,
+    trustedProxy: env.OPENCREDS_TRUSTED_PROXY === "true",
+    anonymousAuthEnabled: authMode === "anonymous" || authMode === "hybrid",
     actionPolicy: new ActionPolicyService({
       allowedActions: parseActionPolicyList(env.OOMOL_CONNECT_ALLOWED_ACTIONS),
       blockedActions: parseActionPolicyList(env.OOMOL_CONNECT_BLOCKED_ACTIONS),
@@ -113,6 +121,10 @@ function createCacheKey(env: CloudflareEnv, publicOrigin: string): string {
     publicOrigin,
     adminToken: env.OOMOL_CONNECT_ADMIN_TOKEN ?? "",
     runtimeToken: env.OOMOL_CONNECT_RUNTIME_TOKEN ?? "",
+    authMode: env.OPENCREDS_AUTH_MODE ?? "",
+    jwtIssuer: env.OPENCREDS_JWT_ISSUER ?? "",
+    jwtAudience: env.OPENCREDS_JWT_AUDIENCE ?? "",
+    trustedProxy: env.OPENCREDS_TRUSTED_PROXY ?? "",
     encryptionKey: env.OOMOL_CONNECT_ENCRYPTION_KEY ?? "",
     allowedActions: env.OOMOL_CONNECT_ALLOWED_ACTIONS ?? "",
     blockedActions: env.OOMOL_CONNECT_BLOCKED_ACTIONS ?? "",

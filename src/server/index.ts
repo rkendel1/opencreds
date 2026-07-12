@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { access, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { readAuthMode } from "../auth/auth-mode.ts";
 import { loadCatalog } from "../catalog-store.ts";
 import { ActionPolicyService, parseActionPolicyList } from "../core/action-policy.ts";
 import { ProviderLoader } from "../providers/provider-loader.ts";
@@ -21,6 +22,14 @@ const transitFileMaxBytes = readPositiveIntegerEnv("OOMOL_CONNECT_TRANSIT_FILE_M
 const secretCodec = createSecretCodec(process.env.OOMOL_CONNECT_ENCRYPTION_KEY);
 const adminToken = process.env.OOMOL_CONNECT_ADMIN_TOKEN;
 const runtimeToken = process.env.OOMOL_CONNECT_RUNTIME_TOKEN;
+const authMode = readAuthMode(
+  process.env.OPENCREDS_AUTH_MODE,
+  process.env.NODE_ENV === "production" ? "runtime-token" : "anonymous",
+);
+const jwtSecret = process.env.OPENCREDS_JWT_SECRET;
+const jwtIssuer = process.env.OPENCREDS_JWT_ISSUER;
+const jwtAudience = process.env.OPENCREDS_JWT_AUDIENCE;
+const trustedProxy = process.env.OPENCREDS_TRUSTED_PROXY === "true";
 const actionPolicy = new ActionPolicyService({
   allowedActions: parseActionPolicyList(process.env.OOMOL_CONNECT_ALLOWED_ACTIONS),
   blockedActions: parseActionPolicyList(process.env.OOMOL_CONNECT_BLOCKED_ACTIONS),
@@ -53,6 +62,12 @@ const { app, runtimeAuthConfigured } = await createConnectApp({
   secretCodec,
   adminToken,
   runtimeToken,
+  authMode,
+  jwtSecret,
+  jwtIssuer,
+  jwtAudience,
+  trustedProxy,
+  anonymousAuthEnabled: authMode === "anonymous" || authMode === "hybrid",
   actionPolicy,
   registerStaticRoutes: (app) => registerStaticRoutes(app, staticRoot),
   logger,
@@ -109,7 +124,6 @@ function readPositiveIntegerEnv(name: string, fallback: number): number {
   if (value === undefined) {
     return fallback;
   }
-
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
