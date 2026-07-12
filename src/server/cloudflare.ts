@@ -71,6 +71,7 @@ async function createCloudflareApp(env: CloudflareEnv, publicOrigin: string): Pr
     jwtIssuer: env.OPENCREDS_JWT_ISSUER,
     jwtAudience: env.OPENCREDS_JWT_AUDIENCE,
     trustedProxy: env.OPENCREDS_TRUSTED_PROXY === "true",
+    storageBackend: "d1",
     anonymousAuthEnabled: authMode === "anonymous" || authMode === "hybrid",
     actionPolicy: new ActionPolicyService({
       allowedActions: parseActionPolicyList(env.OOMOL_CONNECT_ALLOWED_ACTIONS),

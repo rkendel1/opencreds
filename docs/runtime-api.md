@@ -118,9 +118,19 @@ curl -s -X POST http://localhost:3000/api/files \
 The response includes a `downloadUrl` under `/api/files/:fileId`. Local transit files are stored
 under `OOMOL_CONNECT_DATA_DIR/files` and are cleaned up by age.
 
-## Public Runtime Endpoints
+## Public Discovery Endpoints
 
+- `GET /`
+- `GET /health`
 - `GET /v1/health`
+- `GET /version`
+- `GET /capabilities`
+- `GET /report`
+- `GET /openapi.json`
+- `GET /mcp/tools`
+
+## Authenticated Runtime Endpoints
+
 - `GET /v1/providers`
 - `GET /v1/actions`
 - `GET /v1/actions/search`
@@ -182,5 +192,3 @@ These endpoints power the Web Console, examples, and setup scripts:
 - `DELETE /api/runtime-tokens/:id`
 - `GET /api/runs`
 - `POST /mcp`
-- `GET /mcp/tools`
-- `GET /openapi.json`

@@ -67,6 +67,7 @@ const { app, runtimeAuthConfigured } = await createConnectApp({
   jwtIssuer,
   jwtAudience,
   trustedProxy,
+  storageBackend: "sqlite",
   anonymousAuthEnabled: authMode === "anonymous" || authMode === "hybrid",
   actionPolicy,
   registerStaticRoutes: (app) => registerStaticRoutes(app, staticRoot),

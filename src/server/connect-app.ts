@@ -31,6 +31,7 @@ export interface ConnectAppOptions {
   adminToken?: string;
   runtimeToken?: string;
   authMode?: AuthMode;
+  storageBackend?: string;
   jwtSecret?: string;
   jwtIssuer?: string;
   jwtAudience?: string;
@@ -48,6 +49,7 @@ export interface ConnectApp {
 }
 
 export async function createConnectApp(options: ConnectAppOptions): Promise<ConnectApp> {
+  const mode = options.authMode ?? "anonymous";
   const runtimeTokens = new RuntimeTokenService(options.runtimeDatabase.runtimeTokenStore);
   const hasStoredRuntimeTokens = async (): Promise<boolean> => (await runtimeTokens.listTokens()).length > 0;
   const oauthClientConfigs = new OAuthClientConfigService({
@@ -71,7 +73,7 @@ export async function createConnectApp(options: ConnectAppOptions): Promise<Conn
     actionPolicy: options.actionPolicy,
     logger: options.logger,
   });
-  const authProvider = createAuthProvider(options, runtimeTokens);
+  const authProvider = createAuthProvider(options, runtimeTokens, mode);
 
   return {
     app: new ConnectServer({
@@ -95,6 +97,8 @@ export async function createConnectApp(options: ConnectAppOptions): Promise<Conn
         verifyRuntimeToken: (token) => runtimeTokens.verifyToken(token),
       },
       authProvider,
+      authMode: mode,
+      storageBackend: options.storageBackend,
       actionPolicy: options.actionPolicy,
       logger: options.logger,
     }).createApp(),
@@ -104,8 +108,11 @@ export async function createConnectApp(options: ConnectAppOptions): Promise<Conn
   };
 }
 
-function createAuthProvider(options: ConnectAppOptions, runtimeTokens: RuntimeTokenService): IAuthProvider {
-  const mode = options.authMode ?? "anonymous";
+function createAuthProvider(
+  options: ConnectAppOptions,
+  runtimeTokens: RuntimeTokenService,
+  mode: AuthMode,
+): IAuthProvider {
   if (mode === "runtime-token") {
     return new RuntimeTokenAuthProvider({ tokens: runtimeTokens });
   }
