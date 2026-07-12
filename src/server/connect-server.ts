@@ -1,4 +1,4 @@
-import type { IAuthProvider } from "../auth/auth-provider.ts";
+import type { AuthMode, IAuthProvider } from "../auth/auth-provider.ts";
 import type { CatalogStore, RuntimeActionDefinition } from "../catalog-store.ts";
 import type { ConnectionService } from "../connection-service.ts";
 import type { ActionPolicyService } from "../core/action-policy.ts";
@@ -57,6 +57,8 @@ export interface IConnectServerOptions {
   staticRoot?: string;
   auth?: LocalAuthOptions;
   authProvider?: IAuthProvider;
+  authMode?: AuthMode;
+  storageBackend?: string;
   actionPolicy?: ActionPolicyService;
   actionSearch?: ActionSearchIndexProvider;
   registerStaticRoutes?: (app: Hono) => void;
@@ -71,6 +73,7 @@ export class ConnectServer {
   private readonly options: IConnectServerOptions;
   private readonly actionSearch: ActionSearchIndexProvider;
   private readonly proxyRunner: ProxyRunner;
+  private readonly startedAt = Date.now();
 
   constructor(options: IConnectServerOptions) {
     this.options = options;
@@ -101,7 +104,8 @@ export class ConnectServer {
         }
       }
     });
-    app.get("/health", (context) => context.json({ ok: true }));
+    app.get("/", async (context) => context.json(await this.createRootResponse()));
+    app.get("/health", (context) => context.json(this.createHealthResponse()));
     app.use("*", createLocalAuthMiddleware(auth));
     if (this.options.authProvider) {
       app.use(
@@ -112,7 +116,10 @@ export class ConnectServer {
         }),
       );
     }
-    app.get("/v1/health", (context) => writeRuntimeSuccess(context, { ok: true, runtime: "oomol-connect" }));
+    app.get("/v1/health", (context) => writeRuntimeSuccess(context, this.createHealthResponse()));
+    app.get("/version", (context) => context.json(this.createVersionResponse()));
+    app.get("/capabilities", async (context) => context.json(await this.createCapabilitiesResponse()));
+    app.get("/report", async (context) => context.json(await this.createReportResponse()));
     app.get("/v1/providers", (context) => this.listRuntimeProviders(context));
     app.get("/v1/actions", (context) => this.listRuntimeActions(context));
     app.get("/v1/actions/search", (context) => this.searchRuntimeActions(context));
@@ -214,6 +221,99 @@ export class ConnectServer {
     }
 
     return context.json(provider);
+  }
+
+  private async createRootResponse(): Promise<Record<string, unknown>> {
+    const auth = await this.readAuthenticationMetadata();
+    return {
+      service: "OpenCreds",
+      ...this.createVersionResponse(),
+      status: "healthy",
+      authentication: auth,
+      capabilities: {
+        providers: this.options.catalog.providers.length > 0,
+        oauth: this.options.catalog.providers.some((provider) => provider.authTypes.includes("oauth2")),
+        mcp: true,
+        runtime_api: true,
+      },
+      _links: {
+        health: "/v1/health",
+        openapi: "/openapi.json",
+        mcp: "/mcp",
+        docs: "/docs",
+      },
+    };
+  }
+
+  private createHealthResponse(): Record<string, unknown> {
+    return {
+      status: "healthy",
+      checks: {
+        database: "ok",
+        provider_registry: "ok",
+        oauth: this.options.catalog.providers.some((provider) => provider.authTypes.includes("oauth2"))
+          ? "ok"
+          : "disabled",
+        mcp: "ok",
+      },
+    };
+  }
+
+  private createVersionResponse(): Record<string, unknown> {
+    const version = readVersion();
+    const gitCommit = readGitCommit();
+    return {
+      version,
+      ...(gitCommit ? { gitCommit } : {}),
+    };
+  }
+
+  private async createCapabilitiesResponse(): Promise<Record<string, unknown>> {
+    const auth = await this.readAuthenticationMetadata();
+    const version = this.createVersionResponse();
+    return {
+      ...version,
+      authentication: {
+        ...auth,
+        enabledProviders: auth.modes,
+      },
+      storage: {
+        backend: this.options.storageBackend ?? "unknown",
+      },
+      oauth: {
+        enabled: this.options.catalog.providers.some((provider) => provider.authTypes.includes("oauth2")),
+      },
+      mcp: {
+        enabled: true,
+      },
+      providers: {
+        count: this.options.catalog.providers.length,
+      },
+      actions: {
+        count: this.options.catalog.actions.length,
+      },
+    };
+  }
+
+  private async createReportResponse(): Promise<Record<string, unknown>> {
+    const auth = await this.readAuthenticationMetadata();
+    const buildTimestamp = readBuildTimestamp();
+    return {
+      ...this.createVersionResponse(),
+      uptimeSeconds: Math.max(0, Math.floor((Date.now() - this.startedAt) / 1000)),
+      providerCount: this.options.catalog.providers.length,
+      actionCount: this.options.catalog.actions.length,
+      storageBackend: this.options.storageBackend ?? "unknown",
+      authMode: auth.modes,
+      authenticationRequired: auth.required,
+      ...(buildTimestamp ? { buildTimestamp } : {}),
+    };
+  }
+
+  private async readAuthenticationMetadata(): Promise<{ required: boolean; modes: string[]; supported: string[] }> {
+    const modes = await listAuthenticationModes(this.options);
+    const required = modes.length > 0;
+    return { required, modes, supported: modes };
   }
 
   private async createTransitFile(context: Context): Promise<Response> {
@@ -873,13 +973,70 @@ function readConnectionName(context: Context, body?: Record<string, unknown>): s
 
 function shouldAuthenticateRequest(path: string, method: string): boolean {
   return !(
-    path === "/health" ||
+    (method === "GET" && path === "/") ||
+    (method === "GET" && path === "/health") ||
+    (method === "GET" && path === "/v1/health") ||
+    (method === "GET" && path === "/version") ||
+    (method === "GET" && path === "/capabilities") ||
+    (method === "GET" && path === "/report") ||
+    (method === "GET" && path === "/openapi.json") ||
+    (method === "GET" && path === "/mcp/tools") ||
     path === "/oauth/callback" ||
     path.startsWith("/oauth/callback/") ||
     (method === "GET" && path === "/api/auth/session") ||
     (method === "POST" && path === "/api/auth/logout") ||
     (method === "GET" && path.startsWith("/api/files/"))
   );
+}
+
+async function listAuthenticationModes(options: IConnectServerOptions): Promise<string[]> {
+  const modes = new Set<string>();
+  for (const mode of authModesForAuthMode(options.authMode)) {
+    modes.add(mode);
+  }
+
+  if (options.auth?.adminToken) {
+    modes.add("service-token");
+  }
+  if (options.auth?.runtimeToken || (await (options.auth?.hasRuntimeTokens?.() ?? false))) {
+    modes.add("runtime-token");
+  }
+  return [...modes];
+}
+
+function authModesForAuthMode(mode: AuthMode | undefined): readonly string[] {
+  if (mode === "runtime-token") {
+    return ["runtime-token"];
+  }
+  if (mode === "jwt") {
+    return ["jwt"];
+  }
+  if (mode === "proxy") {
+    return ["service-token"];
+  }
+  if (mode === "hybrid") {
+    return ["jwt", "runtime-token", "service-token"];
+  }
+  return [];
+}
+
+function readVersion(): string {
+  return readEnvironmentVariable("OPENCREDS_VERSION") ?? readEnvironmentVariable("npm_package_version") ?? "0.0.0";
+}
+
+function readGitCommit(): string | undefined {
+  return optionalString(readEnvironmentVariable("OPENCREDS_GIT_COMMIT"));
+}
+
+function readBuildTimestamp(): string | undefined {
+  return optionalString(readEnvironmentVariable("OPENCREDS_BUILD_TIMESTAMP"));
+}
+
+function readEnvironmentVariable(name: string): string | undefined {
+  if (typeof process !== "object" || !process || typeof process.env !== "object" || !process.env) {
+    return undefined;
+  }
+  return process.env[name];
 }
 
 type SearchQuery =

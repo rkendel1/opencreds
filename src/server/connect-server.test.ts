@@ -1,3 +1,4 @@
+import type { AuthMode } from "../auth/auth-provider.ts";
 import type { IConnectionStore, StoredConnection } from "../connection-service.ts";
 import type { ActionPolicyService } from "../core/action-policy.ts";
 import type { ActionSearchIndexProvider } from "../core/action-search.ts";
@@ -247,6 +248,56 @@ describe("ConnectServer", () => {
       body: JSON.stringify({ input: {} }),
     });
     expect(adminActionRun.status).toBe(404);
+  });
+
+  it("keeps discovery and health endpoints public while protecting execution routes", async () => {
+    const app = createTestServer([apiKeyProvider], {
+      auth: { adminToken: "local-token", runtimeToken: "runtime-token" },
+      authMode: "runtime-token",
+    }).createApp();
+
+    const root = await app.request("/");
+    expect(root.status).toBe(200);
+    await expect(root.json()).resolves.toMatchObject({
+      service: "OpenCreds",
+      status: "healthy",
+      authentication: {
+        required: true,
+      },
+    });
+    expect((await app.request("/health")).status).toBe(200);
+    expect((await app.request("/v1/health")).status).toBe(200);
+    expect((await app.request("/version")).status).toBe(200);
+    const capabilities = await app.request("/capabilities");
+    expect(capabilities.status).toBe(200);
+    await expect(capabilities.json()).resolves.toMatchObject({
+      authentication: {
+        required: true,
+      },
+      storage: {
+        backend: "memory",
+      },
+    });
+    expect((await app.request("/report")).status).toBe(200);
+    expect((await app.request("/openapi.json")).status).toBe(200);
+    expect((await app.request("/mcp/tools")).status).toBe(200);
+
+    const mcp = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: "1", method: "tools/list", params: {} }),
+    });
+    expect(mcp.status).toBe(401);
+
+    const actionRun = await app.request("/v1/actions/example.echo", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: {} }),
+    });
+    expect(actionRun.status).toBe(401);
+
+    const connections = await app.request("/api/connections");
+    expect(connections.status).toBe(401);
   });
 
   it("serves API routes when static routes are disabled", async () => {
@@ -1735,6 +1786,7 @@ describe("ConnectServer", () => {
 
 interface CreateTestServerOptions {
   auth?: { adminToken?: string; runtimeToken?: string };
+  authMode?: AuthMode;
   actionPolicy?: ActionPolicyService;
   actionSearch?: ActionSearchIndexProvider;
   providerLoader?: IProviderLoader;
@@ -1801,6 +1853,8 @@ function createTestServer(providers: ProviderDefinition[], options: CreateTestSe
       hasRuntimeTokens: async () => (await runtimeTokens.listTokens()).length > 0,
       verifyRuntimeToken: (token) => runtimeTokens.verifyToken(token),
     },
+    authMode: options.authMode ?? "anonymous",
+    storageBackend: "memory",
     actionPolicy: options.actionPolicy,
     actionSearch: options.actionSearch,
     logger: options.logger,
