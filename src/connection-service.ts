@@ -10,6 +10,7 @@ import type {
   ResolvedCredential,
   RuntimeLogger,
 } from "./core/types.ts";
+import type { IdentityContext } from "./identity/types.ts";
 import type { IOAuthCredentialRefresher } from "./oauth/oauth-credential-refresh-service.ts";
 import type { IProviderLoader } from "./providers/provider-loader.ts";
 
@@ -55,6 +56,8 @@ export interface StoredConnection {
   service: string;
   connectionName: string;
   credential: ResolvedCredential;
+  /** Identity context of the connection owner, if any. */
+  identity?: IdentityContext;
 }
 
 export interface DisconnectedConnectionSummary {
@@ -65,12 +68,20 @@ export interface DisconnectedConnectionSummary {
 
 /**
  * Storage contract for local provider connections.
+ *
+ * The identity parameter is optional for backward compatibility with single-user
+ * deployments. When provided, queries are scoped to the given identity context.
  */
 export interface IConnectionStore {
-  get(service: string, connectionName: string): Promise<ResolvedCredential | undefined>;
-  set(service: string, connectionName: string, credential: ResolvedCredential): Promise<void>;
-  delete(service: string, connectionName: string): Promise<void>;
-  list(): Promise<StoredConnection[]>;
+  get(service: string, connectionName: string, identity?: IdentityContext): Promise<ResolvedCredential | undefined>;
+  set(
+    service: string,
+    connectionName: string,
+    credential: ResolvedCredential,
+    identity?: IdentityContext,
+  ): Promise<void>;
+  delete(service: string, connectionName: string, identity?: IdentityContext): Promise<void>;
+  list(identity?: IdentityContext): Promise<StoredConnection[]>;
 }
 
 interface ServiceConnection {

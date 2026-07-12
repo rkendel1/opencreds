@@ -1,5 +1,6 @@
 import type { IConnectionStore } from "../../connection-service.ts";
 import type { ResolvedCredential } from "../../core/types.ts";
+import type { IdentityContext } from "../../identity/types.ts";
 import type { IOAuthClientConfigStore, OAuthClientConfig } from "../../oauth/oauth-client-config-service.ts";
 import type { IOAuthStateStore, OAuthAuthorizationState } from "../../oauth/oauth-flow-service.ts";
 import type { ISecretCodec } from "../secrets/secret-codec-core.ts";
@@ -9,6 +10,7 @@ import type { IRuntimeTokenStore, RuntimeTokenRecord } from "./runtime-token-ser
 
 import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { isEmptyIdentityContext } from "../../identity/types.ts";
 import { PlainTextSecretCodec } from "../secrets/secret-codec-core.ts";
 import { decodeRunLogCursor, encodeRunLogCursor } from "./runtime-store.ts";
 
@@ -26,6 +28,7 @@ interface ConnectionJsonInput {
   secretCodec: ISecretCodec;
   service: string;
   connectionName: string;
+  identity?: IdentityContext;
 }
 
 interface SetConnectionJsonInput extends ConnectionJsonInput {
@@ -121,40 +124,70 @@ export class SqliteConnectionStore implements IConnectionStore {
     this.secretCodec = secretCodec;
   }
 
-  async get(service: string, connectionName: string): Promise<ResolvedCredential | undefined> {
+  async get(
+    service: string,
+    connectionName: string,
+    identity?: IdentityContext,
+  ): Promise<ResolvedCredential | undefined> {
     return await getConnectionJson<ResolvedCredential>({
       database: this.database,
       secretCodec: this.secretCodec,
       service,
       connectionName,
+      identity,
     });
   }
 
-  async set(service: string, connectionName: string, credential: ResolvedCredential): Promise<void> {
+  async set(
+    service: string,
+    connectionName: string,
+    credential: ResolvedCredential,
+    identity?: IdentityContext,
+  ): Promise<void> {
     await setConnectionJson({
       database: this.database,
       secretCodec: this.secretCodec,
       service,
       connectionName,
       value: credential,
+      identity,
     });
   }
 
-  async delete(service: string, connectionName: string): Promise<void> {
+  async delete(service: string, connectionName: string, identity?: IdentityContext): Promise<void> {
+    // Use empty string instead of null to match the primary key
+    const tenantId = identity?.tenantId ?? "";
+    const userId = identity?.userId ?? "";
+
     this.database
-      .prepare("delete from connections where service = ? and connection_name = ?")
-      .run(service, connectionName);
+      .prepare(`delete from connections where service = ? and connection_name = ? and tenant_id = ? and user_id = ?`)
+      .run(service, connectionName, tenantId, userId);
   }
 
-  async list(): Promise<Array<{ service: string; connectionName: string; credential: ResolvedCredential }>> {
+  async list(
+    identity?: IdentityContext,
+  ): Promise<
+    Array<{ service: string; connectionName: string; credential: ResolvedCredential; identity?: IdentityContext }>
+  > {
+    // Use empty string instead of null to match the primary key
+    const tenantId = identity?.tenantId ?? "";
+    const userId = identity?.userId ?? "";
+
     const rows = this.database
-      .prepare("select service, connection_name, value from connections order by service, connection_name")
-      .all();
+      .prepare(
+        `select service, connection_name, value, tenant_id, user_id, workspace_id
+         from connections
+         where tenant_id = ? and user_id = ?
+         order by service, connection_name`,
+      )
+      .all(tenantId, userId);
+
     return await Promise.all(
       rows.map(async (row) => ({
         service: readString(row, "service"),
         connectionName: readString(row, "connection_name"),
         credential: parseJson<ResolvedCredential>(await this.secretCodec.decode(readString(row, "value"))),
+        identity: readIdentityFromRow(row),
       })),
     );
   }
@@ -237,35 +270,78 @@ export class SqliteRuntimeTokenStore implements IRuntimeTokenStore {
     this.database
       .prepare(
         `
-        insert into runtime_tokens (id, name, token_hash, created_at, last_used_at)
-        values (?, ?, ?, ?, ?)
+        insert into runtime_tokens (id, name, token_hash, created_at, last_used_at, tenant_id, user_id)
+        values (?, ?, ?, ?, ?, ?, ?)
       `,
       )
-      .run(record.id, record.name, record.tokenHash, record.createdAt, record.lastUsedAt ?? null);
+      .run(
+        record.id,
+        record.name,
+        record.tokenHash,
+        record.createdAt,
+        record.lastUsedAt ?? null,
+        record.identity?.tenantId ?? null,
+        record.identity?.userId ?? null,
+      );
   }
 
-  async list(): Promise<RuntimeTokenRecord[]> {
-    return this.database
-      .prepare(
-        `
-        select id, name, token_hash, created_at, last_used_at
-        from runtime_tokens
-        where revoked_at is null
-        order by created_at desc, id desc
-      `,
-      )
-      .all()
-      .map((row) => ({
-        id: readString(row, "id"),
-        name: readString(row, "name"),
-        tokenHash: readString(row, "token_hash"),
-        createdAt: readString(row, "created_at"),
-        lastUsedAt: readOptionalString(row, "last_used_at"),
-      }));
+  async list(identity?: IdentityContext): Promise<RuntimeTokenRecord[]> {
+    const rows = isEmptyIdentityContext(identity)
+      ? this.database
+          .prepare(
+            `
+            select id, name, token_hash, created_at, last_used_at, tenant_id, user_id
+            from runtime_tokens
+            where revoked_at is null
+            order by created_at desc, id desc
+          `,
+          )
+          .all()
+      : this.database
+          .prepare(
+            `
+            select id, name, token_hash, created_at, last_used_at, tenant_id, user_id
+            from runtime_tokens
+            where revoked_at is null
+              and (tenant_id = ? or (tenant_id is null and ? is null))
+              and (user_id = ? or (user_id is null and ? is null))
+            order by created_at desc, id desc
+          `,
+          )
+          .all(
+            identity!.tenantId ?? null,
+            identity!.tenantId ?? null,
+            identity!.userId ?? null,
+            identity!.userId ?? null,
+          );
+
+    return rows.map((row) => ({
+      id: readString(row, "id"),
+      name: readString(row, "name"),
+      tokenHash: readString(row, "token_hash"),
+      createdAt: readString(row, "created_at"),
+      lastUsedAt: readOptionalString(row, "last_used_at"),
+      identity: readTokenIdentityFromRow(row),
+    }));
   }
 
-  async revoke(id: string): Promise<boolean> {
-    const result = this.database.prepare("delete from runtime_tokens where id = ?").run(id);
+  async revoke(id: string, identity?: IdentityContext): Promise<boolean> {
+    const result = isEmptyIdentityContext(identity)
+      ? this.database.prepare("delete from runtime_tokens where id = ?").run(id)
+      : this.database
+          .prepare(
+            `delete from runtime_tokens
+             where id = ?
+               and (tenant_id = ? or (tenant_id is null and ? is null))
+               and (user_id = ? or (user_id is null and ? is null))`,
+          )
+          .run(
+            id,
+            identity!.tenantId ?? null,
+            identity!.tenantId ?? null,
+            identity!.userId ?? null,
+            identity!.userId ?? null,
+          );
     return result.changes > 0;
   }
 
@@ -475,9 +551,17 @@ async function getSecretJson<T>(input: SecretJsonInput): Promise<T | undefined> 
 }
 
 async function getConnectionJson<T>(input: ConnectionJsonInput): Promise<T | undefined> {
+  // Use empty string instead of null to match the primary key
+  const tenantId = input.identity?.tenantId ?? "";
+  const userId = input.identity?.userId ?? "";
+
   const row = input.database
-    .prepare("select value from connections where service = ? and connection_name = ?")
-    .get(input.service, input.connectionName) as RuntimeRow | undefined;
+    .prepare(
+      `select value from connections
+       where service = ? and connection_name = ? and tenant_id = ? and user_id = ?`,
+    )
+    .get(input.service, input.connectionName, tenantId, userId) as RuntimeRow | undefined;
+
   return row ? parseJson<T>(await input.secretCodec.decode(readString(row, "value"))) : undefined;
 }
 
@@ -492,22 +576,27 @@ function getStoredValue(
 }
 
 async function setConnectionJson(input: SetConnectionJsonInput): Promise<void> {
+  const now = new Date().toISOString();
+  const encodedValue = await input.secretCodec.encode(JSON.stringify(input.value));
+  // Use empty string instead of null for identity fields to match the primary key
+  const tenantId = input.identity?.tenantId ?? "";
+  const userId = input.identity?.userId ?? "";
+  const workspaceId = input.identity?.workspaceId ?? null;
+
+  // With the compound primary key (service, connection_name, tenant_id, user_id),
+  // we can use standard UPSERT syntax
   input.database
     .prepare(
       `
-      insert into connections (service, connection_name, value, updated_at)
-      values (?, ?, ?, ?)
-      on conflict(service, connection_name) do update set
+      insert into connections (service, connection_name, tenant_id, user_id, workspace_id, value, updated_at)
+      values (?, ?, ?, ?, ?, ?, ?)
+      on conflict(service, connection_name, tenant_id, user_id) do update set
         value = excluded.value,
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        workspace_id = excluded.workspace_id
     `,
     )
-    .run(
-      input.service,
-      input.connectionName,
-      await input.secretCodec.encode(JSON.stringify(input.value)),
-      new Date().toISOString(),
-    );
+    .run(input.service, input.connectionName, tenantId, userId, workspaceId, encodedValue, now);
 }
 
 async function setServiceJson(input: SetServiceJsonInput): Promise<void> {
@@ -553,4 +642,53 @@ function readOptionalString(row: unknown, key: string): string | undefined {
 
 function parseJson<T>(value: string): T {
   return JSON.parse(value) as T;
+}
+
+function readIdentityFromRow(row: unknown): IdentityContext | undefined {
+  const tenantId = readOptionalString(row, "tenant_id");
+  const userId = readOptionalString(row, "user_id");
+  const workspaceId = readOptionalString(row, "workspace_id");
+
+  // Empty strings are treated as no identity (single-user mode)
+  const hasTenant = tenantId !== undefined && tenantId !== "";
+  const hasUser = userId !== undefined && userId !== "";
+  const hasWorkspace = workspaceId !== undefined && workspaceId !== "";
+
+  if (!hasTenant && !hasUser && !hasWorkspace) {
+    return undefined;
+  }
+
+  const identity: IdentityContext = {};
+  if (hasTenant) {
+    identity.tenantId = tenantId;
+  }
+  if (hasUser) {
+    identity.userId = userId;
+  }
+  if (hasWorkspace) {
+    identity.workspaceId = workspaceId;
+  }
+  return identity;
+}
+
+function readTokenIdentityFromRow(row: unknown): IdentityContext | undefined {
+  const tenantId = readOptionalString(row, "tenant_id");
+  const userId = readOptionalString(row, "user_id");
+
+  // Empty strings or null are treated as no identity (single-user mode)
+  const hasTenant = tenantId !== undefined && tenantId !== null && tenantId !== "";
+  const hasUser = userId !== undefined && userId !== null && userId !== "";
+
+  if (!hasTenant && !hasUser) {
+    return undefined;
+  }
+
+  const identity: IdentityContext = {};
+  if (hasTenant) {
+    identity.tenantId = tenantId;
+  }
+  if (hasUser) {
+    identity.userId = userId;
+  }
+  return identity;
 }
