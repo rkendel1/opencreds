@@ -35,16 +35,23 @@ boundaries, maintaining backward compatibility with single-user deployments.
 When resolving credentials, the identity model follows this precedence:
 
 ```
-Workspace (stored as metadata)
+Workspace (currently: stored as metadata only)
     ↓
-User (enforced isolation)
+User (currently: enforced isolation)
     ↓
-Tenant (enforced isolation)
+Tenant (currently: enforced isolation)
 ```
 
-- Workspace overrides user preferences (future enhancement)
-- User overrides tenant defaults
-- If nothing exists → Return Not Found
+**Current Implementation**:
+- Tenant + User isolation is **enforced** in storage queries
+- Workspace ID is **stored** but not used for isolation
+- User credentials override tenant defaults
+
+**Future Enhancement**:
+- Workspace-level isolation (would require schema changes)
+- Workspace overrides user preferences
+
+If nothing exists → Return Not Found
 
 **Important**: The system never silently falls back across identities.
 
